@@ -7,12 +7,12 @@ object Spark01_WordCount {
   def main(args: Array[String]): Unit = {
     // Application
     // Spark 框架
-    // TODO 建立和 Spark 框架的连接
+    // 一、建立和 Spark 框架的连接
     //JDBC: Connection
     val sparkConf = new SparkConf().setMaster("local").setAppName("WordCount")
     val sc = new SparkContext(sparkConf)
 
-    // TODO 执行业务操作
+    // 二、执行业务操作
 
     // 1. 读取文件，获取一行一行的数据
     // hello world
@@ -25,13 +25,19 @@ object Spark01_WordCount {
 
     // 3. 将数据根据单词进行分组，便于统计
     // (hello, hello, hello), (word, word)
-    val group: RDD[(String, Iterable[String])] = words.groupBy(word => word)
+    val wordGroup: RDD[(String, Iterable[String])] = words.groupBy(word => word)
 
 
     // 4. 对分组后的数据进行转换
     // (hello, hello, hello), (word, word) -> (hello, 3), (world, 2)
+    val word2Count = wordGroup.map {
+      case (word, list) => (word, list.size)
+    }
+    // 5. 将转换结果采集到控制台打印出来
+    val array: Array[(String, Int)] = word2Count.collect()
+    array.foreach(println)
 
-    // TODO 关闭连接
+    // 三、关闭连接
     sc.stop()
   }
 }
