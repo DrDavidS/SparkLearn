@@ -27,10 +27,9 @@ object Spark01_WordCount {
     // (hello, hello, hello), (word, word)
     val wordGroup: RDD[(String, Iterable[String])] = words.groupBy(word => word)
 
-
     // 4. 对分组后的数据进行转换
     // (hello, hello, hello), (word, word) -> (hello, 3), (world, 2)
-    val word2Count = wordGroup.map {
+    val word2Count: RDD[(String, Int)] = wordGroup.map {
       case (word, list) => (word, list.size)
     }
     // 5. 将转换结果采集到控制台打印出来
