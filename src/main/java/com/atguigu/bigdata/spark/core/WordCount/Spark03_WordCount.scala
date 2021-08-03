@@ -3,6 +3,22 @@ package com.atguigu.bigdata.spark.core.WordCount
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
+
+/**
+ * 这是比较精简版本的 WordCount 操作
+ * RDD的数据处理方式类似于IO流，也有装饰者设计模式
+ * RDD的数据只有在调用collect方法时，才会真正执行业务逻辑操作，之前的都是功能的扩展
+ *
+ * 其中RDD包装顺序如下：
+ * RDD - 对应函数
+ * 1. HadoopRDD - textFile
+ * 2. MapPartitionsRDD - flatMap
+ * 3. MapPartitionsRDD - map
+ * 4. ShuffledRDD - reduceByKey
+ *
+ * 此外RDD中间不保存数据
+ */
+
 object Spark03_WordCount {
   def main(args: Array[String]): Unit = {
     // Application02
