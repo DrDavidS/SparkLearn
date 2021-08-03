@@ -1,3 +1,5 @@
 *.class
 *.xml
 *.iml
+/logs/root.log
+/logs/bagedate.log
