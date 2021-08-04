@@ -16,8 +16,9 @@ import org.apache.spark.{SparkConf, SparkContext}
  * 3. MapPartitionsRDD - map
  * 4. ShuffledRDD - reduceByKey
  *
- * 此外 RDD 中间不保存数据，但是IO中会保存部分数据
- * RDD 是一个抽象类，需要子类具体实现
+ * 此外：
+ *  RDD 中间不保存数据，但是IO中会保存部分数据
+ *  RDD 是一个抽象类（abstract class RDD），需要子类具体实现
  */
 
 object Spark03_WordCount {
