@@ -16,7 +16,8 @@ import org.apache.spark.{SparkConf, SparkContext}
  * 3. MapPartitionsRDD - map
  * 4. ShuffledRDD - reduceByKey
  *
- * 此外RDD中间不保存数据
+ * 此外 RDD 中间不保存数据，但是IO中会保存部分数据
+ * RDD 是一个抽象类，需要子类具体实现
  */
 
 object Spark03_WordCount {
@@ -25,7 +26,7 @@ object Spark03_WordCount {
     // Spark 框架
     // 一、建立和 Spark 框架的连接
     //JDBC: Connection
-    val sparkConf = new SparkConf().setMaster("local").setAppName("WordCount")
+    val sparkConf: SparkConf = new SparkConf().setMaster("local").setAppName("WordCount")
     val sc = new SparkContext(sparkConf)
 
     // 二、执行业务操作
@@ -36,13 +37,13 @@ object Spark03_WordCount {
     val words: RDD[String] = lines.flatMap(_.split(" "))
 
     val word2one: RDD[(String, Int)] = words.map(
-      word => (word, 1)
+      (word: String) => (word, 1)
     )
 
     // Spark框架提供了更多的功能，可以将分组和聚合使用一个方法实现
     // 相同的 key 的数据，可以对 value 进行 reduce 聚合
     // word2one.reduceByKey((x, y) => {x + y})
-    val word2Count = word2one.reduceByKey(_ + _)
+    val word2Count: RDD[(String, Int)] = word2one.reduceByKey(_ + _)
 
     // 最后打印运行结果
     val array3: Array[(String, Int)] = word2Count.collect()
