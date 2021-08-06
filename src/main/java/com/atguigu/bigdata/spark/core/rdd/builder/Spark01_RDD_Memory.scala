@@ -3,6 +3,10 @@ package com.atguigu.bigdata.spark.core.rdd.builder
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
+/**
+ * 从内存中创建RDD
+ */
+
 object Spark01_RDD_Memory {
   def main(args: Array[String]): Unit = {
     // 1. 准备环境
