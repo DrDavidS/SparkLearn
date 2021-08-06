@@ -4,7 +4,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
- * 从内存中创建RDD
+ * 从内存中创建RDD，原始玩法
  */
 
 object Spark01_RDD_Memory {
