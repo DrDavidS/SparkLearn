@@ -1,5 +1,5 @@
 *.class
-*.xml
+*.xml !pom.xml
 *.iml
 /logs/root.log
 /logs/bagedate.log
