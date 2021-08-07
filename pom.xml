@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>
+        <!-- 描述你当前POM模型版本 -->
+        4.0.0
+    </modelVersion>
+    <groupId>
+        <!-- 组织、公司名称 -->
+        groupId
+    </groupId>
+    <artifactId>
+        <!-- 项目名称 -->
+        SparkLearn
+    </artifactId>
+    <version>
+        <!-- 版本、里程碑 -->
+        1.0-SNAPSHOT
+    </version>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <!-- 在这里加入相关依赖 -->
+        <dependency>
+            <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-core -->
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_2.12</artifactId>
+            <version>3.1.2</version>
+        </dependency>
+    </dependencies>
+
+</project>
