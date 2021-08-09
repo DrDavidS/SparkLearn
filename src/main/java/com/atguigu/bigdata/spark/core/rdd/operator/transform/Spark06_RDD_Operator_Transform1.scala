@@ -7,9 +7,10 @@ import org.apache.spark.{SparkConf, SparkContext}
  * P52 https://www.bilibili.com/video/BV11A411L7CK?p=52
  * groupBy 的用法
  *
+ * 按首字母来分组，现在看看例子
  */
 
-object Spark06_RDD_Operator_Transform {
+object Spark06_RDD_Operator_Transform1 {
   def main(args: Array[String]): Unit = {
     // 1. 准备环境
     val sparkConf: SparkConf = new SparkConf().setMaster("local[*]").setAppName("RDD")
@@ -17,13 +18,10 @@ object Spark06_RDD_Operator_Transform {
 
 
     // TODO 算子 - groupBy
-    val rdd: RDD[Int] = sc.makeRDD(List(1, 2, 3, 4), 2)
+    val rdd: RDD[String] = sc.makeRDD(List("Hello", "Scala", "Hello", "Spark"), 2)
 
-    def groupFunction(num: Int): Int = {
-      num % 2
-    }
-
-    val groupRDD: RDD[(Int, Iterable[Int])] = rdd.groupBy(groupFunction)
+    // 分组和分区没有必然关系
+    val groupRDD: RDD[(Char, Iterable[String])] = rdd.groupBy(_.charAt(0))
 
     groupRDD.collect().foreach(println)
     sc.stop()
