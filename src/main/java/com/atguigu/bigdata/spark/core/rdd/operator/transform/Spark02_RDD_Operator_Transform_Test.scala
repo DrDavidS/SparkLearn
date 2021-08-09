@@ -4,7 +4,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
- * 练习：取出每个分区的最大值
+ * 练习：取出每个分区的最大值 by mapPartitions
  */
 
 object Spark02_RDD_Operator_Transform_Test {
@@ -14,7 +14,7 @@ object Spark02_RDD_Operator_Transform_Test {
     val sc = new SparkContext(sparkConf)
 
 
-    // TODO 算子 - map
+    // TODO 算子 - mapPartitions
     val rdd: RDD[Int] = sc.makeRDD(List(1, 2, 3, 4), 2)
     //【1，2】，【3，4】
     // 【2】，【4】
