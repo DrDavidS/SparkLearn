@@ -3,7 +3,11 @@ package com.atguigu.bigdata.spark.core.rdd.operator.transform
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
-object Spark01_RDD_Operator_Transform {
+/**
+ * 练习：取出每个分区的最大值
+ */
+
+object Spark02_RDD_Operator_Transform_Test {
   def main(args: Array[String]): Unit = {
     // 1. 准备环境
     val sparkConf: SparkConf = new SparkConf().setMaster("local[*]").setAppName("RDD")
@@ -11,16 +15,14 @@ object Spark01_RDD_Operator_Transform {
 
 
     // TODO 算子 - map
-    val rdd = sc.makeRDD(List(1, 2, 3, 4))
-    // 1,2,3,4
-    // 2,4,6,8
-
-    //    def mapFunction(num: Int): Int = {
-    //      num * 2
-    //    }
-
-    // val mapRDD: RDD[Int] = rdd.map(mapFunction)
-    val mapRDD: RDD[Int] = rdd.map(_ * 2)
+    val rdd: RDD[Int] = sc.makeRDD(List(1, 2, 3, 4), 2)
+    //【1，2】，【3，4】
+    // 【2】，【4】
+    val mapRDD: RDD[Int] = rdd.mapPartitions(
+      iter => {
+        List(iter.max).iterator
+      }
+    )
 
     mapRDD.collect().foreach(println)
 

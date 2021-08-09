@@ -3,7 +3,11 @@ package com.atguigu.bigdata.spark.core.rdd.operator.transform
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
-object Spark01_RDD_Operator_Transform {
+/**
+ * Spark尝试读取文件，Split取特定位置
+ */
+
+object Spark01_RDD_Operator_Transform_Test {
   def main(args: Array[String]): Unit = {
     // 1. 准备环境
     val sparkConf: SparkConf = new SparkConf().setMaster("local[*]").setAppName("RDD")
@@ -11,19 +15,14 @@ object Spark01_RDD_Operator_Transform {
 
 
     // TODO 算子 - map
-    val rdd = sc.makeRDD(List(1, 2, 3, 4))
-    // 1,2,3,4
-    // 2,4,6,8
-
-    //    def mapFunction(num: Int): Int = {
-    //      num * 2
-    //    }
-
-    // val mapRDD: RDD[Int] = rdd.map(mapFunction)
-    val mapRDD: RDD[Int] = rdd.map(_ * 2)
+    val rdd: RDD[String] = sc.textFile("datas/1.txt")
+    val mapRDD: RDD[String] = rdd.map(
+      line => {
+        val datas = line.split(" ")  // 空格分割
+        datas(1)
+      })
 
     mapRDD.collect().foreach(println)
-
     sc.stop()
   }
 }
