@@ -6,7 +6,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 /**
  * P70 https://www.bilibili.com/video/BV11A411L7CK?p=70
  * KV类型
- *
+ * aggregateByKey：先计算分区内，再计算分区间
  *
  */
 
@@ -33,10 +33,10 @@ object Spark18_RDD_Operator_Transform3 {
     // 做一个元组(t, v)，其中 v 代表次数
     val newRDD: RDD[(String, (Int, Int))] = rdd.aggregateByKey((0, 0))(
       (t: (Int, Int), v: Int) => {
-        (t._1 + v, t._2 + 1)
+        (t._1 + v, t._2 + 1)  // 分区内，前者数量相加，后者次数+1
       },
       (t1: (Int, Int), t2: (Int, Int)) => {
-        (t1._1 + t2._1, t1._2 + t2._2)
+        (t1._1 + t2._1, t1._2 + t2._2)  // 分区间，前者数量相加，后者次数相加
       }
     )
 
