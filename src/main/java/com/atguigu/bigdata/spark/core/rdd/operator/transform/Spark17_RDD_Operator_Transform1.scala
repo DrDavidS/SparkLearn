@@ -11,7 +11,7 @@ import org.apache.spark.{SparkConf, SparkContext}
  *
  */
 
-object Spark17_RDD_Operator_Transform {
+object Spark17_RDD_Operator_Transform1 {
   def main(args: Array[String]): Unit = {
     // 1. 准备环境
     val sparkConf: SparkConf = new SparkConf().setMaster("local[*]").setAppName("RDD")
@@ -20,11 +20,7 @@ object Spark17_RDD_Operator_Transform {
 
     // TODO 算子 - KV类型 aggregateByKey
 
-    val rdd: RDD[(String, Int)] = sc.makeRDD(
-      List(
-        ("a", 1), ("a", 2), ("b", 3),
-        ("b", 4), ("b", 5), ("a", 6)
-      ), 2)
+    val rdd: RDD[(String, Int)] = sc.makeRDD(List(("a", 1), ("a", 2), ("a", 3), ("b", 4)), 2)
     // (a分区，【1,2】)，(a分区，【3,4】)
     // (a,2),(a,4)
     // (a,6)
