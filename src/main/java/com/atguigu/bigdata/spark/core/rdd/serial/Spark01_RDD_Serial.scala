@@ -1,4 +1,4 @@
-package com.atguigu.bigdata.spark.core.rdd.operator.serial
+package com.atguigu.bigdata.spark.core.rdd.serial
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
