@@ -7,7 +7,7 @@ import org.apache.spark.{SparkConf, SparkContext}
  * P104 IO 相关
  */
 
-class Spark01_RDD_IO_Save {
+object Spark01_RDD_IO_Save {
   def main(args: Array[String]): Unit = {
     val sparkConf: SparkConf = new SparkConf().setMaster("local").setAppName("WordCount")
     val sc = new SparkContext(sparkConf)
