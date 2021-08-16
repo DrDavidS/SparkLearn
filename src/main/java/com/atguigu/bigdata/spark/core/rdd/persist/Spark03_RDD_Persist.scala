@@ -1,19 +1,20 @@
 package com.atguigu.bigdata.spark.core.rdd.persist
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
- * P94-P99 RDD的持久化
+ * P100 RDD的持久化
  *
- * 以简单的WordCount为例子
- * 你可能觉得重复使用很简单？实际上RDD不保存结果。所以实际上是重新算了一次
+ * 使用 cache() 方法来持久化数据，保存在内存中
  *
- * 对象重新使用了，但是数据无法重用。所以真的要重用的话，我们可以采用持久化操作
+ * persist() 则选择保存在哪里。
  *
+ * RDD的对象持久化操作，不一定是为了重用。在数据执行很长，或者比较重要的操作场合也可以持久化。
  */
 
-object Spark01_RDD_Persist {
+object Spark03_RDD_Persist {
   def main(args: Array[String]): Unit = {
 
     val sparkConf: SparkConf = new SparkConf().setMaster("local").setAppName("WordCount")
@@ -27,12 +28,14 @@ object Spark01_RDD_Persist {
 
     val mapRDD: RDD[(String, Int)] = flatRDD.map((_, 1))
 
+    // mapRDD.cache()
+    mapRDD.persist(StorageLevel.DISK_ONLY)
+
     val reduceRDD: RDD[(String, Int)] = mapRDD.reduceByKey(_ + _)
 
     reduceRDD.collect().foreach(println)
 
     println("************************")
-
     val groupRDD: RDD[(String, Iterable[Int])] = mapRDD.groupByKey()
 
     groupRDD.collect().foreach(println)

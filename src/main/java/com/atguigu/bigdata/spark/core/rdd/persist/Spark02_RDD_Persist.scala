@@ -7,13 +7,10 @@ import org.apache.spark.{SparkConf, SparkContext}
  * P94-P99 RDD的持久化
  *
  * 以简单的WordCount为例子
- * 你可能觉得重复使用很简单？实际上RDD不保存结果。所以实际上是重新算了一次
- *
- * 对象重新使用了，但是数据无法重用。所以真的要重用的话，我们可以采用持久化操作
  *
  */
 
-object Spark01_RDD_Persist {
+object Spark02_RDD_Persist {
   def main(args: Array[String]): Unit = {
 
     val sparkConf: SparkConf = new SparkConf().setMaster("local").setAppName("WordCount")
@@ -32,8 +29,15 @@ object Spark01_RDD_Persist {
     reduceRDD.collect().foreach(println)
 
     println("************************")
+    val list1 = List("Hello Scala", "Hello Spark")
 
-    val groupRDD: RDD[(String, Iterable[Int])] = mapRDD.groupByKey()
+    val rdd1: RDD[String] = sc.makeRDD(list1)
+
+    val flatRDD1: RDD[String] = rdd1.flatMap(_.split(" "))
+
+    val mapRDD1: RDD[(String, Int)] = flatRDD1.map((_, 1))
+
+    val groupRDD: RDD[(String, Iterable[Int])] = mapRDD1.groupByKey()
 
     groupRDD.collect().foreach(println)
 
