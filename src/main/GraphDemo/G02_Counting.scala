@@ -52,8 +52,9 @@ object G02_Counting {
      * 还有一种似乎更简单的思路，直接计算腾讯公司的入度边属性之和。
      */
 
+
     // 直接投资腾讯的边
-    val shareEdgeInvTencent: RDD[Edge[Double]] = graph.edges.filter(e => e.dstId == 5L)
+    val shareEdgeInvTencent: RDD[Edge[Double]] = graph.edges.filter((e: Edge[Double]) => e.dstId == 5L)
     shareEdgeInvTencent.collect.foreach(println)
     // 聚合边的属性
   }
