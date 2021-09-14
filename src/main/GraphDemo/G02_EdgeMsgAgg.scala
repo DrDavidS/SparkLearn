@@ -38,20 +38,6 @@ object G02_EdgeMsgAgg {
       (4L, ("张志东", "自然人")),
       (5L, ("深圳市腾讯计算机系统有限公司", "法人")),
       (6L, ("武汉鲨鱼网络直播技术有限公司", "法人")),
-<<<<<<< HEAD
-      (7L, ("武汉斗鱼网络科技有限公司", "法人"))
-    )
-    val vertexSeqRDD: RDD[(VertexId, (String, String))] = sc.parallelize(vertexSeq)
-
-    // 创建边关系，边的属性就是投资金额
-    val shareEdgeSeq = Seq(
-      Edge(1L, 5L, 3528.6),
-      Edge(2L, 5L, 742.9),
-      Edge(3L, 5L, 742.9),
-      Edge(4L, 5L, 1485.7),
-      Edge(5L, 6L, 50.0),
-      Edge(7L, 6L, 50.0)
-=======
       (7L, ("武汉斗鱼网络科技有限公司", "法人")),
       (8L, ("张文明", "自然人")),
       (9L, ("陈少杰", "自然人")),
@@ -74,12 +60,12 @@ object G02_EdgeMsgAgg {
       Edge(8L, 7L, 87.5), // 张文明 -> 斗鱼
       Edge(9L, 7L, 1122.2), // 陈少杰 -> 斗鱼
       Edge(6L, 10L, 500.0) // 鲨鱼 -> 深圳鲨鱼
->>>>>>> 55ee2ac (边消息的聚合)
     )
     val shareEdgeRDD: RDD[Edge[Double]] = sc.parallelize(shareEdgeSeq)
 
     // 构建初始图
     val graph: Graph[(String, String), Double] = Graph(vertexSeqRDD, shareEdgeRDD)
+
 
     /*
      * CASE 2
