@@ -24,7 +24,10 @@ object G01_BuildShareGraph {
       (4L, ("张志东", "自然人")),
       (5L, ("深圳市腾讯计算机系统有限公司", "法人")),
       (6L, ("武汉鲨鱼网络直播技术有限公司", "法人")),
-      (7L, ("武汉斗鱼网络科技有限公司", "法人"))
+      (7L, ("武汉斗鱼网络科技有限公司", "法人")),
+      (8L, ("张文明", "自然人")),
+      (9L, ("陈少杰", "自然人")),
+      (10L, ("深圳市鲨鱼文化科技有限公司", "法人"))
     )
     val vertexSeqRDD: RDD[(VertexId, (String, String))] = sc.parallelize(vertexSeq)
 
@@ -34,12 +37,15 @@ object G01_BuildShareGraph {
     * 其中斗鱼这块认缴资金是虚构的
     */
     val shareEdgeSeq = Seq(
-      Edge(1L, 5L, 3528.6),
-      Edge(2L, 5L, 742.9),
-      Edge(3L, 5L, 742.9),
-      Edge(4L, 5L, 1485.7),
-      Edge(5L, 6L, 50.0),
-      Edge(7L, 6L, 50.0)
+      Edge(1L, 5L, 3528.6), // 马化腾 -> 腾讯
+      Edge(2L, 5L, 742.9), // 陈一丹 -> 腾讯
+      Edge(3L, 5L, 742.9), // 许晨晔 -> 腾讯
+      Edge(4L, 5L, 1485.7), // 张志东 -> 腾讯
+      Edge(5L, 6L, 50.0), // 腾讯 -> 鲨鱼
+      Edge(7L, 6L, 50.0), // 斗鱼 -> 鲨鱼
+      Edge(8L, 7L, 87.5), // 张文明 -> 斗鱼
+      Edge(9L, 7L, 1122.2), // 陈少杰 -> 斗鱼
+      Edge(6L, 10L, 500.0) // 鲨鱼 -> 深圳鲨鱼
     )
     val shareEdgeRDD: RDD[Edge[Double]] = sc.parallelize(shareEdgeSeq)
 
@@ -57,8 +63,6 @@ object G01_BuildShareGraph {
     graph.vertices.collect.foreach(println)
     println("\n================ 打印边 ===================")
     graph.edges.foreach(println)
-
-
 
 
   }
