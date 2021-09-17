@@ -27,7 +27,7 @@ object G04_NeighborhoodAggregation {
 
     // 计算老一些的关注用户的总年龄
     val olderFollowers: VertexRDD[(Int, Double)] = graph.aggregateMessages[(Int, Double)]( // 聚合函数
-      triplet => { // 做一个map操作
+      (triplet: EdgeContext[Double, Int, (Int, Double)]) => { // 做一个map操作
         if (triplet.srcAttr > triplet.dstAttr) { // 如果源的"Attr"大于目标的，注意这里是一个follow关系
           // Send message to destination vertex containing counter and age
           // 将消息发送给目标顶点，包括计数和年龄
