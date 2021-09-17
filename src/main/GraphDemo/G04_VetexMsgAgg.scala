@@ -7,6 +7,7 @@ import org.apache.spark.{SparkConf, SparkContext}
  *
  * 首先，本节我们给顶点加一个属性，叫做年龄。
  *
+ * 本次实验的目的是计算投资人的平均年龄，依旧采用 aggregateMessages 函数来解决。
  */
 
 object G04_VetexMsgAgg {
@@ -59,7 +60,6 @@ object G04_VetexMsgAgg {
      * 原因是，我们只构建了子图的边，但是顶点没有做限制，所以顶点作为孤立点存在了子图中
      *
      */
-
     println("\n================ 打印投资三元组关系 ===================\n")
     graph.triplets.map(
       (triplet: EdgeTriplet[(String, String, String), Double]) =>
@@ -69,17 +69,70 @@ object G04_VetexMsgAgg {
     /**
      *
      * @param triplet 三元组 EdgeTriplet[(String, String, String), Double]
-     * @return 返回字符串，投资人类型+名称
+     * @return 返回字符串，投资人类型+名称+被投资对象+金额
      */
     def invTypeFunc(triplet: EdgeTriplet[(String, String, String), Double]): String = {
       val invType: String = triplet.srcAttr._2
       val invName: String = triplet.srcAttr._1
+      val beInvName: String = triplet.dstAttr._1
+      val invMoney: Double = triplet.attr
+
       invType match {
-        case "自然人" => "投资人是自然人  " + invName
-        case "法人" => "投资人是法人  " + invName
-        case "政府机关" => "投资人是政府机关  " + invName
-        case _ => "投资人类型不明确  " + invName
+        case "自然人" => s"投资人是自然人: $invName 投资了 $beInvName ,金额为：$invMoney"
+        case "法人" => s"投资人是法人: $invName 投资了 $beInvName ,金额为：$invMoney"
+        case "政府机关" => s"投资人是政府机关: $invName 投资了 $beInvName ,金额为：$invMoney"
+        case _ => "投资人类型不明确 : " + invName
       }
     }
+
+    /*
+     * CASE 2
+     *
+     * 我们现在想计算一下企业股东的平均年龄
+     * 注意这里的投资人特指自然人哦，所以我们需要在消息聚合的时候排除掉非自然人股东。
+     *
+     * 这里我们依然使用强大的消息聚合函数 aggregateMessages
+     *
+     *
+     */
+
+    val sumAgeOfShareHolders: VertexRDD[(Int, Int)] = graph.aggregateMessages[(Int, Int)](
+      triplet => {
+        /*
+        aggregateMessages 分两步走，第一步发送消息：
+
+        首先判断股东类型，如果股东是自然人：
+        1. 将股东的年龄属性转换为int，存入age变量
+        2. 将age发送到Dst
+         */
+        if (triplet.srcAttr._2 == "自然人") {
+          val age: Int = triplet.srcAttr._3.toInt
+          triplet.sendToDst((1, age))
+        }
+      },
+      /*
+      aggregateMessages 分两步走，第二步，聚合消息：
+
+      x._1 是计数
+      x._2 是年龄
+
+      计数和计数相加，年龄和年龄相加
+       */
+      (x: (Int, Int), y: (Int, Int)) => (x._1 + y._1, x._2 + y._2)
+    )
+
+    println("\n================ 打印总年龄 ===================\n")
+    sumAgeOfShareHolders.collect.foreach(println)
+
+    // 当前我们获得了总年龄和总计数
+    // 现在我们开始求平均年龄
+    val avgAgeOfShareHolders = sumAgeOfShareHolders.mapValues((id: VertexId, sumAge: (Int, Int)) =>
+      sumAge match {
+        case (count, sum) => sum / count
+      }
+    )
+    // 打印结果
+    println("\n================ 打印股东平均年龄 ===================\n")
+    avgAgeOfShareHolders.collect.foreach(println)
   }
 }
