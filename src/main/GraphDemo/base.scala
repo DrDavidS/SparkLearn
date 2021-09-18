@@ -5,7 +5,7 @@ case class baseProperties(
                            invType: String, // 类型，比如自然人、法人、政府机关
                            age: String, // 年龄
                            totalMoney: BigDecimal = 0.0, // 总注册金额
-                           oneStepInvInfo: Map[VertexId, investmentInfo] // 一级投资对象的持股信息
+                           oneStepInvInfo: Map[VertexId, investmentInfo] // N级投资对象的持股信息
                          )
 
 case class investmentInfo(
