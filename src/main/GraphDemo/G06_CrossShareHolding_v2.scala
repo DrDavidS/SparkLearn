@@ -1,20 +1,20 @@
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SparkContext
 
 /**
- * Graph Demo第六步：计算两步控股关系
+ * * Graph Demo第六步：计算两步控股关系
  *
  * 以后计算更多步就可以以此类推了。
  * 同时，由于 Tuple 类型的使用不便，我们可以采用 case class 的形式来处理
- * 我们将相关的 case class 新建了文件
+ *
+ *
  *
  */
 
 object G06_CrossShareHolding_v2 {
   def main(args: Array[String]): Unit = {
-    val sparkConf: SparkConf = new SparkConf().setMaster("local").setAppName("GraphX Ops")
-    val sc = new SparkContext(sparkConf)
+    val sc: SparkContext = SparkLocalConf().sc
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
