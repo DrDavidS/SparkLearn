@@ -96,7 +96,7 @@ object G06_CrossShareHolding_v2 {
         val investedCompanyId: VertexId = triplet.dstId // 被投资企业id
         val investedComName: String = triplet.dstAttr.name // 被投资企业名称
 
-        val directSharePercentage: String = (oneInvestmentMoney / totalInvestment).formatted("%.2f")
+        val directSharePercentage: String = (oneInvestmentMoney / totalInvestment).formatted("%.6f")
 
         // 这里传一个hashmap，其key是公司名称，value是 investmentInfo类，里面有各种信息
         val investmentMap = Map(investedCompanyId ->
