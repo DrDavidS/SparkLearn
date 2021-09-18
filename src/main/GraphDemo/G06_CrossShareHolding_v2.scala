@@ -3,12 +3,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 
 /**
- * * Graph Demo第六步：计算两步控股关系
+ * * Graph Demo第六步：计算两步控股关系-准备工作
  *
+ * 这里我们做了一下准备工作，主要是用各种Case Class来管理相关的变量等，为后面的正式计算做好准备。
  * 以后计算更多步就可以以此类推了。
  * 同时，由于 Tuple 类型的使用不便，我们可以采用 case class 的形式来处理
- *
- *
  *
  */
 
