@@ -95,6 +95,7 @@ object G06_CrossShareHolding_v2 {
         val totalInvestment: BigDecimal = triplet.dstAttr.totalMoney // 企业总注册资本
         val investedCompanyId: VertexId = triplet.dstId // 被投资企业id
         val investedComName: String = triplet.dstAttr.name // 被投资企业名称
+        val upperStream: VertexId = triplet.srcId //股东id
 
         val directSharePercentage: String = (oneInvestmentMoney / totalInvestment).formatted("%.6f")
 
@@ -105,6 +106,7 @@ object G06_CrossShareHolding_v2 {
             , directSharePercentage // 投资占比
             , oneInvestmentMoney // 投资金额
             , totalInvestment // 注册资本
+            , upperStream // 上游股东id
           )) // 默认层级
         triplet.sendToSrc(investmentMap)
       },
