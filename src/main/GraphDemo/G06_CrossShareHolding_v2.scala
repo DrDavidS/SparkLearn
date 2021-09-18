@@ -7,24 +7,9 @@ import org.apache.spark.{SparkConf, SparkContext}
  *
  * 以后计算更多步就可以以此类推了。
  * 同时，由于 Tuple 类型的使用不便，我们可以采用 case class 的形式来处理
+ * 我们将相关的 case class 新建了文件
  *
  */
-
-case class baseProperties(
-                           name: String, // 名称
-                           invType: String, // 类型，比如自然人、法人、政府机关
-                           age: String, // 年龄
-                           totalMoney: BigDecimal, // 总注册金额
-                           oneStepInvInfo: Map[VertexId, investmentInfo] // 一级投资对象的持股信息
-                         )
-
-case class investmentInfo(
-                           proportionOfI: String, // 投资占比
-                           oneInvestment: BigDecimal, // 一个投资金额
-                           totalInvestment: BigDecimal, // 被投资对象的总注册资本（总投资金额）
-                           upperStream: VertexId, // 此对象的上游对象（投资方）
-                           level: String // 距离当前节点的层级
-                         )
 
 object G06_CrossShareHolding_v2 {
   def main(args: Array[String]): Unit = {
@@ -33,17 +18,17 @@ object G06_CrossShareHolding_v2 {
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
-      (1L, baseProperties("马化腾", "自然人", "50", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (2L, baseProperties("陈一丹", "自然人", "50", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (3L, baseProperties("许晨晔", "自然人", "52", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (4L, baseProperties("张志东", "自然人", "49", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (5L, baseProperties("深圳市腾讯计算机系统有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (6L, baseProperties("武汉鲨鱼网络直播技术有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (7L, baseProperties("武汉斗鱼网络科技有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (8L, baseProperties("张文明", "自然人", "42", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (9L, baseProperties("陈少杰", "自然人", "39", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (10L, baseProperties("深圳市鲨鱼文化科技有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1")))),
-      (11L, baseProperties("成都霜思文化传播有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1"))))
+      (1L, baseProperties("马化腾", "自然人", "50", 0.0, Map(99999L -> investmentInfo()))),
+      (2L, baseProperties("陈一丹", "自然人", "50", 0.0, Map(99999L -> investmentInfo()))),
+      (3L, baseProperties("许晨晔", "自然人", "52", 0.0, Map(99999L -> investmentInfo()))),
+      (4L, baseProperties("张志东", "自然人", "49", 0.0, Map(99999L -> investmentInfo()))),
+      (5L, baseProperties("深圳市腾讯计算机系统有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
+      (6L, baseProperties("武汉鲨鱼网络直播技术有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
+      (7L, baseProperties("武汉斗鱼网络科技有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
+      (8L, baseProperties("张文明", "自然人", "42", 0.0, Map(99999L -> investmentInfo()))),
+      (9L, baseProperties("陈少杰", "自然人", "39", 0.0, Map(99999L -> investmentInfo()))),
+      (10L, baseProperties("深圳市鲨鱼文化科技有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
+      (11L, baseProperties("成都霜思文化传播有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo())))
     )
     val vertexSeqRDD: RDD[(VertexId, baseProperties)] = sc.parallelize(vertexSeq)
 
@@ -109,18 +94,18 @@ object G06_CrossShareHolding_v2 {
         val oneInvestmentMoney: BigDecimal = BigDecimal(triplet.attr) // 单个股东投资资金，此信息在边上面
         val totalInvestment: BigDecimal = triplet.dstAttr.totalMoney // 企业总注册资本
         val investedCompanyId: VertexId = triplet.dstId // 被投资企业id
-
+        val investedComName: String = triplet.dstAttr.name // 被投资企业名称
 
         val directSharePercentage: String = (oneInvestmentMoney / totalInvestment).formatted("%.2f")
 
         // 这里传一个hashmap，其key是公司名称，value是 investmentInfo类，里面有各种信息
         val investmentMap = Map(investedCompanyId ->
           investmentInfo(
-            directSharePercentage // 投资占比
+            investedComName // 被投资企业名称
+            , directSharePercentage // 投资占比
             , oneInvestmentMoney // 投资金额
             , totalInvestment // 注册资本
-            , 99998L // 默认节点
-            , "-1")) // 默认层级
+          )) // 默认层级
         triplet.sendToSrc(investmentMap)
       },
       // 聚合
@@ -135,7 +120,7 @@ object G06_CrossShareHolding_v2 {
 
     val newVertexWithInvInfo: VertexRDD[baseProperties] = newGraph.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
-        val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(Map(99999L -> investmentInfo("0.00", 0, 0, 99998L, "-1"))) // 设立一个空属性
+        val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(Map(99999L -> investmentInfo())) // 设立一个空属性
         baseProperties(vd.name, vd.invType, vd.age, vd.totalMoney, mapOfInvProportion)
         // 名称、类型、年龄【自然人】、总注册资本【法人】、投资占比
       }
