@@ -91,7 +91,7 @@ object G06_CrossShareHolding_v2 {
     val proportionOfShareHolding: VertexRDD[Map[VertexId, investmentInfo]] = newGraph.aggregateMessages[Map[VertexId, investmentInfo]](
       (triplet: EdgeContext[baseProperties, Double, Map[VertexId, investmentInfo]]) => {
         val oneInvestmentMoney: BigDecimal = BigDecimal(triplet.attr) // 单个股东投资资金，此信息在边上面
-        val totalInvestment: BigDecimal = triplet.dstAttr.totalMoney // 企业总注册资本
+        val totalInvestment: BigDecimal = triplet.dstAttr.registeredCapital // 企业总注册资本
         val investedCompanyId: VertexId = triplet.dstId // 被投资企业id
         val investedComName: String = triplet.dstAttr.name // 被投资企业名称
         val upperStream: VertexId = triplet.srcId //股东id
@@ -103,7 +103,6 @@ object G06_CrossShareHolding_v2 {
           investmentInfo(
             investedComName // 被投资企业名称
             , directSharePercentage // 投资占比
-            , oneInvestmentMoney // 投资金额
             , totalInvestment // 注册资本
             , upperStream // 上游股东id
           )) // 默认层级
@@ -122,7 +121,7 @@ object G06_CrossShareHolding_v2 {
     val newVertexWithInvInfo: VertexRDD[baseProperties] = newGraph.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
         val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(Map(99999L -> investmentInfo())) // 设立一个空属性
-        baseProperties(vd.name, vd.invType, vd.age, vd.totalMoney, mapOfInvProportion)
+        baseProperties(vd.name, vd.invType, vd.age, vd.registeredCapital, mapOfInvProportion)
         // 名称、类型、年龄【自然人】、总注册资本【法人】、投资占比
       }
     )
