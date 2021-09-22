@@ -11,7 +11,10 @@ object G07_CrossShareHolding_v3 {
   def main(args: Array[String]): Unit = {
     val sc: SparkContext = SparkLocalConf().sc
 
-    val defaultInvestmentInfo = Map(99999L -> investmentInfo())  // 默认投资信息
+    // 定义默认信息，以防止某些边与未知用户出现关系
+    // 或者供 getOrElse 使用
+    val defaultInvestmentInfo = Map(99999L -> investmentInfo())
+    val defaultVertex: baseProperties = baseProperties("default_com_name", "其他", "999", 0.0, defaultInvestmentInfo)
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
@@ -49,7 +52,7 @@ object G07_CrossShareHolding_v3 {
     val shareEdgeRDD: RDD[Edge[Double]] = sc.parallelize(shareEdgeSeq)
 
     // 构建初始图
-    val graph: Graph[baseProperties, Double] = Graph(vertexSeqRDD, shareEdgeRDD)
+    val graph: Graph[baseProperties, Double] = Graph(vertexSeqRDD, shareEdgeRDD, defaultVertex)
 
     /*
      * STEP1 第一次 aggregateMessages
@@ -81,7 +84,7 @@ object G07_CrossShareHolding_v3 {
       }
     )
     // 新建一张图
-    val newGraph: Graph[baseProperties, Double] = Graph(newVertexWithMoney, graph.edges)
+    val newGraph: Graph[baseProperties, Double] = Graph(newVertexWithMoney, graph.edges, defaultVertex)
 
     /*
      * STEP3 第二次aggregateMessages
@@ -127,9 +130,9 @@ object G07_CrossShareHolding_v3 {
       }
     )
     // 新建一张图 newGraph2
-    val newGraph2: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges)
-    println("\n================ 打印newGraph2新生成的顶点 ===================\n")
-    newGraph2.vertices.collect.foreach(println)
+    val SecondNewGraph: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
+    //    println("\n================ 打印newGraph2新生成的顶点 ===================\n")
+    //    SecondNewGraph.vertices.collect.foreach(println)
 
     /*
      * STEP5 第三次aggregateMessages
@@ -145,7 +148,7 @@ object G07_CrossShareHolding_v3 {
      */
     // TODO 整个加一个 For 循环，限制在3次循环
     // TODO 修改变量名称，当前名称非常不规范
-    val nStepOfShareHolding = newGraph2.aggregateMessages[Map[VertexId, investmentInfo]](
+    val nStepOfShareHolding: VertexRDD[Map[VertexId, investmentInfo]] = SecondNewGraph.aggregateMessages[Map[VertexId, investmentInfo]](
       (triplet: EdgeContext[baseProperties, Double, Map[VertexId, investmentInfo]]) => {
         /* 在这里计算多层级，首先举个例子：
          * 以 腾讯 和 武汉鲨鱼 这条边为例子，看看上下游节点存在的信息：
@@ -224,17 +227,40 @@ object G07_CrossShareHolding_v3 {
               , upperStreamId = srcID // 上游股东id
               // , level = 1
             ))
+          // 当前只有多级的投资Map，需要和旧Map合并起来
+          val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
           // TODO: 当前层级还是默认的1，应该改为2
-          triplet.sendToSrc(investmentMap)
+          triplet.sendToSrc(newUnionOldInvestmentMap)
         }
         )
       },
       _ ++ _
       // 在这里发送
     )
-    println("\n=================\n")
-    nStepOfShareHolding.collect.foreach(println)
 
     // TODO: 合并生成新图
+    /*
+     * STEP6 又来一次Join，把二级投资的 Map 弄进去
+     *
+     * 新建一张图 newGraph3，此图将会合并二级股权穿透的信息
+     * 就是拿 newGraph2 去 leftJoin nStepOfShareHolding
+     *
+     */
+
+    val newVertexWithMulLevelInvestInfo: VertexRDD[baseProperties] = SecondNewGraph.vertices.leftZipJoin(nStepOfShareHolding)(
+      (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
+        val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
+        baseProperties(
+          vd.name, // 姓名
+          vd.invType, // 投资方类型——自然人or法人
+          vd.age, // 投资人年龄（自然人）
+          vd.registeredCapital, // 注册资本
+          mapOfInvProportion) // 持股信息
+      }
+    )
+    // 新建一张图 thirdNewGraph
+    val thirdNewGraph: Graph[baseProperties, Double] = Graph(newVertexWithMulLevelInvestInfo, graph.edges, defaultVertex)
+    println("\n================ 打印 thirdNewGraph 新生成的顶点 ===================\n")
+    thirdNewGraph.vertices.collect.foreach(println)
   }
 }
