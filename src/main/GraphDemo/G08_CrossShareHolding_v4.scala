@@ -2,6 +2,8 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 
+import scala.annotation.tailrec
+
 /**
  * Graph Demo 在G07的基础上，把图做得更复杂一些
  *
@@ -131,6 +133,7 @@ object G08_CrossShareHolding_v4 {
     // 新建一张图 newGraph2
     val SecondNewGraph: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
 
+    // TODO: 简化代码，把上面的内容整合进 nStepShareHoldingCalculate
 
     /**
      *
@@ -146,15 +149,27 @@ object G08_CrossShareHolding_v4 {
           dstInvestInfo.foreach((kv: (VertexId, investmentInfo)) => {
             // dstInvestInfo 的上游id，去srcInvestInfo里面查询
 
+            // 下游顶点下面被投资企业的ID
             val dstInvestComID: VertexId = kv._1
+            // 下游顶点被投资企业的名称
             val dstInvestComName: String = kv._2.investedComName
+            // 下游顶点下面被投资企业的注册资本
             val dstInvestComRegisteredCapital: BigDecimal = kv._2.registeredCapital
+            // 上游顶点企业
             val srcID: VertexId = triplet.srcId
+            // 上游顶点对下游顶点的投资信息
             val srcLinkDstInfo: investmentInfo = srcInvestInfo.getOrElse(kv._2.upperStreamId, investmentInfo())
+            // 层级间隔，下游顶点到再下游被投资企业的层级
+            val dstLevel: Int = kv._2.level
 
+            // 上游顶点对下游顶点的投资比例
             val srcProportionOfInvestment: BigDecimal = BigDecimal(srcLinkDstInfo.proportionOfInvestment)
+            // 下游顶点对接受其投资的公司的投资比例
             val dstProportionOfInvestment: BigDecimal = BigDecimal(kv._2.proportionOfInvestment)
+            // 相乘，并限制精度
             val mulLevelProportionOfInvestment: String = (srcProportionOfInvestment * dstProportionOfInvestment).formatted("%.6f")
+            // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
+            val srcLinkDstLevel:Int = dstLevel + 1
             // 放回Map
             val investmentMap = Map(dstInvestComID ->
               investmentInfo(
@@ -162,7 +177,7 @@ object G08_CrossShareHolding_v4 {
                 , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比
                 , registeredCapital = dstInvestComRegisteredCapital // 总注册资本
                 , upperStreamId = srcID // 上游股东id
-                // , level = 1
+                , level = srcLinkDstLevel  // 层级间隔
               ))
             // 当前只有多级的投资Map，需要和旧Map合并起来
             val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
@@ -196,19 +211,28 @@ object G08_CrossShareHolding_v4 {
     }
 
     /*
-     * STEP5 在这里启用For循环
+     * STEP5 在这里启用多层调用
+     *
+     * 尾递归实现
      */
-    //  TODO: for循环，上次输出作为下次输入
-//    val nStepGraphSeq: Seq[Graph[baseProperties, Double]] = for (i <- 1 to 3) yield {
-//
-//    }
+    def tailFact(n: Int): Graph[baseProperties, Double] = {
+      /**
+       *
+       * @param n       递归次数
+       * @param currRes 当前结果
+       * @return 递归n次后的的Graph
+       */
+      @tailrec
+      def loop(n: Int, currRes: Graph[baseProperties, Double]): Graph[baseProperties, Double] = {
+        if (n == 0) return currRes
+        loop(n - 1, nStepShareHoldingCalculate(currRes))
+      }
 
-    val thirdNewGraph: Graph[baseProperties, Double] = nStepShareHoldingCalculate(SecondNewGraph)
-
-
+      loop(n, SecondNewGraph) // loop(递归次数, 初始值)
+    }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    // val nStepGraph: Graph[baseProperties, Double] = nStepGraphSeq.last
-    thirdNewGraph.vertices.collect.foreach(println)
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(6)
+    ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
