@@ -209,6 +209,7 @@ object G07_CrossShareHolding_v3 {
 
 
           // 比如 srcLinkDstInfo 的值是 investmentInfo(武汉鲨鱼网络直播技术有限公司,0.500000,50.0,100.0,5,1)
+          // 就是腾讯对武汉鲨鱼的投资信息
           val srcLinkDstInfo: investmentInfo = srcInvestInfo.getOrElse(kv._2.upperStreamId, investmentInfo())
 
           // 获取 腾讯对武汉鲨鱼 的 持股比例
