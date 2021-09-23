@@ -232,7 +232,7 @@ object G08_CrossShareHolding_v4 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(6)
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(6)  // 经过测试，递归次数增加不影响结果
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
