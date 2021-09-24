@@ -24,7 +24,10 @@ import scala.annotation.tailrec
  * 狮驼岭集团股份有限公司,法人,0,0.0,Map(3 -> investmentInfo(狮驼岭左护法有限公司,1.000000,177.0,6,1),
  * 4 -> investmentInfo(狮驼岭右护法有限公司,1.000000,125.0,6,1))
  *
- *
+ * 此外，这里有个重要的改进，就是之前的编程，在Map消息阶段是直接Map合并的，这回导致Reduce阶段多边合并计算控股会重复计算
+ * 所以这里采用了下面的方法过滤：
+ * srcInvestInfo.filter(kv => kv._1 == triplet.dstId)
+ * 只计算单线投资信息
  *
  */
 
@@ -180,19 +183,32 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
                 , level = srcLinkDstLevel // 层级间隔
               ))
             // 当前只有多级的投资Map，需要和旧Map合并起来
-            val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
+            // 之前这里多合并了 srcInvestInfo 的信息，实际上我们是不需要非这条线上的投资信息的，保留会导致后面合并有问题
+            // TODO 进一步检查
+            val investmentInfoThisLine: Map[VertexId, investmentInfo] = srcInvestInfo.filter(kv => kv._1 == triplet.dstId)
+            val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = investmentInfoThisLine ++ investmentMap
             triplet.sendToSrc(newUnionOldInvestmentMap)
           }
           )
         },
-        // TODO: Reduce
-        // https://stackoverflow.com/questions/20047080/scala-merge-map
-        // https://stackoverflow.com/questions/46652676/scala-merge-two-immutable-maps-on-key-and-get-new-immutable-map-with-same-type
-        (x: Map[VertexId, investmentInfo], y: Map[VertexId, investmentInfo]) => {
-          x ++ y
-        }
+        // https://stackoverflow.com/questions/7076128/best-way-to-merge-two-maps-and-sum-the-values-of-same-key
+        (leftMap: Map[VertexId, investmentInfo], rightMap: Map[VertexId, investmentInfo]) => {
+          leftMap ++ rightMap.map {
+            case (k: VertexId, v: investmentInfo) =>
+              // 左右投资比例相加
+              val sumOfProportion: BigDecimal = {
+                BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
+              }
 
-        // 在这里发送
+              k -> investmentInfo(
+                investedComName = v.investedComName // 被投资企业名称
+                , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比
+                , registeredCapital = v.registeredCapital // 总注册资本
+                , upperStreamId = v.upperStreamId // 上游股东id
+                , level = v.level // 层级间隔
+              )
+          }
+        }
       )
 
       /*
