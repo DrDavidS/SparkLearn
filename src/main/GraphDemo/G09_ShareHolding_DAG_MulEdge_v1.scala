@@ -42,7 +42,7 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
-      // (1L, baseProperties("青毛狮子怪", "妖怪", "500", 0.0, defaultInvestmentInfo)),
+      (1L, baseProperties("青毛狮子怪", "妖怪", "500", 0.0, defaultInvestmentInfo)),
       (3L, baseProperties("狮驼岭左护法有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
       (4L, baseProperties("狮驼岭右护法有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
       (5L, baseProperties("狮驼岭小钻风巡山有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
@@ -56,7 +56,7 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
     * 其中斗鱼这块认缴资金是虚构的
     */
     val shareEdgeSeq = Seq(
-      // Edge(1L, 6L, 2000.0), // 青毛狮子怪 -> 狮驼岭集团
+      Edge(1L, 6L, 2000.0), // 青毛狮子怪 -> 狮驼岭集团
       Edge(6L, 4L, 125.0), // 狮驼岭集团 -> 右护法
       Edge(6L, 3L, 177.0), // 狮驼岭集团 -> 左护法
       Edge(4L, 5L, 520.0), // 右护法 -> 小钻风
@@ -184,22 +184,26 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
               ))
             // 当前只有多级的投资Map，需要和旧Map合并起来
             // 之前这里多合并了 srcInvestInfo 的信息，实际上我们是不需要非这条线上的投资信息的，保留会导致后面合并有问题
-            // TODO 进一步检查
+            // TODO 进一步检查，还是不对。当前问题：狮子对狮驼岭的持股错误
             val investmentInfoThisLine: Map[VertexId, investmentInfo] = srcInvestInfo.filter(kv => kv._1 == triplet.dstId)
             val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = investmentInfoThisLine ++ investmentMap
             triplet.sendToSrc(newUnionOldInvestmentMap)
           }
           )
         },
+        // Reduce
         // https://stackoverflow.com/questions/7076128/best-way-to-merge-two-maps-and-sum-the-values-of-same-key
         (leftMap: Map[VertexId, investmentInfo], rightMap: Map[VertexId, investmentInfo]) => {
+
+          println("leftMap   " + leftMap)
+          println("rightMap  " + rightMap)
+          println("\n============\n")
           leftMap ++ rightMap.map {
             case (k: VertexId, v: investmentInfo) =>
               // 左右投资比例相加
               val sumOfProportion: BigDecimal = {
                 BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
               }
-
               k -> investmentInfo(
                 investedComName = v.investedComName // 被投资企业名称
                 , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比
@@ -253,7 +257,7 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(1) // 经过测试，递归次数增加不影响结果
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(0) // 理论上递归次数增加不影响结果才是对的
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
