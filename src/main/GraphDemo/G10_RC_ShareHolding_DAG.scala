@@ -7,31 +7,11 @@ import scala.annotation.tailrec
 /**
  * Graph Demo 09 多边持股判断
  *
- * 这里需要将多个边求和。如果直接在这个图上运行之前DAG的代码，会发现有问题：
- * 青毛狮子怪对小钻风的控股肯定是 100% 的，但是这里只取了右护法的控股 67.53% 传了过去
- *
- * 从这个例子看，实际上我们缺少了同 key 控股比例合并的步骤，导致股权计算不准确。
- *
- * 另外看看精度是否符合要求：0.675325 + 0.324675 = 1.000000
- *
- * 思考：如何去解决这个问题？
- * 应该在 nStepShareHoldingCalculate 函数里面解决，做一个合并。我们先假设AB节点之间不存在直连的多条边，
- * 即使有，也可以用 groupEdges 方法合并
- *
- *
- * 现在开始分析问题
- * 在第一步中，狮驼岭集团已有投资信息【单层信息，tailFact(0) 的情况】：
- * 狮驼岭集团股份有限公司,法人,0,0.0,Map(3 -> investmentInfo(狮驼岭左护法有限公司,1.000000,177.0,6,1),
- * 4 -> investmentInfo(狮驼岭右护法有限公司,1.000000,125.0,6,1))
- *
- * 此外，这里有个重要的改进，就是之前的编程，在Map消息阶段是直接Map合并的，这回导致Reduce阶段多边合并计算控股会重复计算
- * 所以这里采用了下面的方法过滤：
- * srcInvestInfo.filter(kv => kv._1 == triplet.dstId)
- * 只计算单线投资信息
+ * 重制DAG
  *
  */
 
-object G09_ShareHolding_DAG_MulEdge_v1 {
+object G10_RC_ShareHolding_DAG {
   def main(args: Array[String]): Unit = {
     val sc: SparkContext = SparkLocalConf().sc
 
@@ -68,7 +48,13 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
     val graph: Graph[baseProperties, Double] = Graph(vertexSeqRDD, shareEdgeRDD, defaultVertex)
 
     /*
-     * STEP1 第一次 aggregateMessages
+     * STEP1 求企业的总注册资本
+     *
+     * 当前我们企业是没有总注册资本的，所以需要将顶点的所有入边上的投资金额加起来，得到企业的总注册资本
+     * 也就是企业的各个上级股东的总共投资金额
+     *
+     * 这里是第一次聚合，本次聚合不计算持股比例，只计算总额。
+     *
      */
 
     val sumMoneyOfCompany: VertexRDD[BigDecimal] = graph.aggregateMessages[BigDecimal](
@@ -79,43 +65,40 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
       _ + _
     )
 
-    /*
-     * STEP2 将聚合起来的数据sumMoneyOfCompany 和 旧 graph 做一次 join
-     */
-
-    val newVertexWithMoney: VertexRDD[baseProperties] = graph.vertices.leftZipJoin(sumMoneyOfCompany)(
+    val newVertexWithRegisteredCapital: VertexRDD[baseProperties] = graph.vertices.leftZipJoin(sumMoneyOfCompany)(
       (vid: VertexId, vd: baseProperties, nvd: Option[BigDecimal]) => {
         val sumOfMoney: BigDecimal = nvd.getOrElse(BigDecimal(0.0))
         baseProperties(vd.name, sumOfMoney, vd.oneStepInvInfo)
-        // 名称、类型、年龄、总注册资本、Map(一阶投资信息)
+        // 名称、总注册资本、Map(一阶投资信息)
       }
     )
-    // 新建一张图
-    val newGraph: Graph[baseProperties, Double] = Graph(newVertexWithMoney, graph.edges, defaultVertex)
+    // 新建图一：此图额外记录了所有顶点的注册资本（自然人除外）
+    val GraphOfRegisteredCapital: Graph[baseProperties, Double] = Graph(newVertexWithRegisteredCapital, graph.edges, defaultVertex)
 
     /*
+     * =================================
      * STEP3 第二次aggregateMessages
      * 总资金除以边上资金，得到资金占比，返回src
+     * =================================
      */
 
-    val proportionOfShareHolding: VertexRDD[Map[VertexId, investmentInfo]] = newGraph.aggregateMessages[Map[VertexId, investmentInfo]](
+    val proportionOfShareHolding: VertexRDD[Map[VertexId, investmentInfo]] = GraphOfRegisteredCapital.aggregateMessages[Map[VertexId, investmentInfo]](
       (triplet: EdgeContext[baseProperties, Double, Map[VertexId, investmentInfo]]) => {
-        val oneInvestmentMoney: BigDecimal = BigDecimal(triplet.attr) // 单个股东投资资金，此信息在边上面
-        val totalInvestment: BigDecimal = triplet.dstAttr.registeredCapital // 企业总注册资本
-        val investedCompanyId: VertexId = triplet.dstId // 被投资企业id
-        val investedComName: String = triplet.dstAttr.name // 被投资企业名称
-        val upperStream: VertexId = triplet.srcId //股东id
+        val oneInvestmentMoney: BigDecimal = BigDecimal(triplet.attr) // 边上游的股东对边下游企业的投资资金
+        val registeredCapital: BigDecimal = triplet.dstAttr.registeredCapital // 边下游被投资的企业总注册资本
+        val investedCompanyId: VertexId = triplet.dstId // 边下游被投资的企业id
+        val investedComName: String = triplet.dstAttr.name // 边下游被投资的企业名称
+        val upperStreamShareHolderId: VertexId = triplet.srcId //边上游的股东id
 
+        // 直接持股比例 = 投资资金 / 企业总注册资本
+        val directInvestedPercentage: String = (oneInvestmentMoney / registeredCapital).formatted("%.6f")
 
-        val directSharePercentage: String = (oneInvestmentMoney / totalInvestment).formatted("%.6f")
-
-        // 这里传一个hashmap，其key是公司名称，value是 investmentInfo类，里面有各种信息
         val investmentMap = Map(investedCompanyId ->
           investmentInfo(
             investedComName // 被投资企业名称
-            , directSharePercentage // 投资占比
-            , totalInvestment // 注册资本
-            , upperStream // 上游股东id
+            , directInvestedPercentage // 投资占比
+            , registeredCapital // 注册资本
+            , upperStreamShareHolderId // 上游股东id
           ))
         triplet.sendToSrc(investmentMap)
       },
@@ -126,15 +109,15 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
      * STEP4 再来一次Join，把Map弄进去
      */
 
-    val newVertexWithInvInfo: VertexRDD[baseProperties] = newGraph.vertices.leftZipJoin(proportionOfShareHolding)(
+    val newVertexWithInvInfo: VertexRDD[baseProperties] = GraphOfRegisteredCapital.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
         val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
         baseProperties(vd.name, vd.registeredCapital, mapOfInvProportion)
         // 名称、类型、年龄【自然人】、总注册资本【法人】、投资占比
       }
     )
-    // 新建一张图 newGraph2
-    val SecondNewGraph: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
+    // 新建一张图 oneStepInvInfoGraph
+    val oneStepInvInfoGraph: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
 
     // TODO: 简化代码，把上面的内容整合进 nStepShareHoldingCalculate
 
@@ -152,41 +135,48 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
           dstInvestInfo.foreach((kv: (VertexId, investmentInfo)) => {
             // dstInvestInfo 的上游id，去srcInvestInfo里面查询
 
-            // 下游顶点下面被投资企业的ID
+            // 下游顶点之下被投资企业的ID：5L
             val dstInvestComID: VertexId = kv._1
-            // 下游顶点被投资企业的名称
+            // 下游顶点之下被投资企业的名称：狮驼岭小钻风巡山有限公司
             val dstInvestComName: String = kv._2.investedComName
-            // 下游顶点下面被投资企业的注册资本
+            // 下游顶点下面被投资企业的注册资本：770万
             val dstInvestComRegisteredCapital: BigDecimal = kv._2.registeredCapital
-            // 上游顶点企业
+            // 上游顶点企业:6L
             val srcID: VertexId = triplet.srcId
             // 上游顶点对下游顶点的投资信息
+            /*
+            Map(
+                  3 -> investmentInfo(狮驼岭左护法有限公司,1.000000,177.0,6,1),
+                  4 -> investmentInfo(狮驼岭右护法有限公司,1.000000,125.0,6,1)
+                )
+             */
             val srcLinkDstInfo: investmentInfo = srcInvestInfo.getOrElse(kv._2.upperStreamId, investmentInfo())
             // 层级间隔，下游顶点到再下游被投资企业的层级
+            // 1
             val dstLevel: Int = kv._2.level
 
             // 上游顶点对下游顶点的投资比例
+            // 狮驼岭 -> 右护法：1.000000
             val srcProportionOfInvestment: BigDecimal = BigDecimal(srcLinkDstInfo.proportionOfInvestment)
-            // 下游顶点对接受其投资的公司的投资比例
+            // 下游顶点对下面的公司的投资比例
+            // 右护法 -> 小钻风：0.675325
             val dstProportionOfInvestment: BigDecimal = BigDecimal(kv._2.proportionOfInvestment)
-            // 相乘，并限制精度
+            // 相乘，并限制精度。得到上游顶点对下游顶点下面的公司的投资比例
+            // 0.675325
             val mulLevelProportionOfInvestment: String = (srcProportionOfInvestment * dstProportionOfInvestment).formatted("%.6f")
             // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
             val srcLinkDstLevel: Int = dstLevel + 1
-            // 放回Map
-            val investmentMap = Map(dstInvestComID ->
+            // 放回Map暂存，等待发送
+            val investmentMap = Map(dstInvestComID ->  // 5L
               investmentInfo(
-                investedComName = dstInvestComName // 被投资企业名称
-                , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比
-                , registeredCapital = dstInvestComRegisteredCapital // 总注册资本
-                , upperStreamId = srcID // 上游股东id
-                , level = srcLinkDstLevel // 层级间隔
+                investedComName = dstInvestComName // 被投资企业名称：狮驼岭小钻风巡山有限公司
+                , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比：0.675325
+                , registeredCapital = dstInvestComRegisteredCapital // 总注册资本：770万
+                , upperStreamId = srcID // 边上游股东id：6L
+                , level = srcLinkDstLevel // 层级间隔：2
+                , addSign = true  // 后面reduce需要合并，这里改为true
               ))
-            // 当前只有多级的投资Map，需要和旧Map合并起来
-            // 之前这里多合并了 srcInvestInfo 的信息，实际上我们是不需要非这条线上的投资信息的，保留会导致后面合并有问题
-            // TODO 进一步检查，还是不对。当前问题：狮子对狮驼岭的持股错误
-            val investmentInfoThisLine: Map[VertexId, investmentInfo] = srcInvestInfo.filter(kv => kv._1 == triplet.dstId)
-            val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = investmentInfoThisLine ++ investmentMap
+            val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
             triplet.sendToSrc(newUnionOldInvestmentMap)
           }
           )
@@ -198,6 +188,7 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
           println("leftMap   " + leftMap)
           println("rightMap  " + rightMap)
           println("\n============\n")
+          // TODO 这里要做的就是增加一个true false 判断
           leftMap ++ rightMap.map {
             case (k: VertexId, v: investmentInfo) =>
               // 左右投资比例相加
@@ -251,11 +242,11 @@ object G09_ShareHolding_DAG_MulEdge_v1 {
         loop(n - 1, nStepShareHoldingCalculate(currRes))
       }
 
-      loop(n, SecondNewGraph) // loop(递归次数, 初始值)
+      loop(n, oneStepInvInfoGraph) // loop(递归次数, 初始值)
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(0) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(1) // 理论上递归次数增加不影响结果才是对的
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }

@@ -17,17 +17,17 @@ object G06_CrossShareHolding_v2 {
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
-      (1L, baseProperties("马化腾", "自然人", "50", 0.0, Map(99999L -> investmentInfo()))),
-      (2L, baseProperties("陈一丹", "自然人", "50", 0.0, Map(99999L -> investmentInfo()))),
-      (3L, baseProperties("许晨晔", "自然人", "52", 0.0, Map(99999L -> investmentInfo()))),
-      (4L, baseProperties("张志东", "自然人", "49", 0.0, Map(99999L -> investmentInfo()))),
-      (5L, baseProperties("深圳市腾讯计算机系统有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
-      (6L, baseProperties("武汉鲨鱼网络直播技术有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
-      (7L, baseProperties("武汉斗鱼网络科技有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
-      (8L, baseProperties("张文明", "自然人", "42", 0.0, Map(99999L -> investmentInfo()))),
-      (9L, baseProperties("陈少杰", "自然人", "39", 0.0, Map(99999L -> investmentInfo()))),
-      (10L, baseProperties("深圳市鲨鱼文化科技有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo()))),
-      (11L, baseProperties("成都霜思文化传播有限公司", "法人", "0", 0.0, Map(99999L -> investmentInfo())))
+      (1L, baseProperties("马化腾", 0.0, Map(99999L -> investmentInfo()))),
+      (2L, baseProperties("陈一丹", 0.0, Map(99999L -> investmentInfo()))),
+      (3L, baseProperties("许晨晔", 0.0, Map(99999L -> investmentInfo()))),
+      (4L, baseProperties("张志东", 0.0, Map(99999L -> investmentInfo()))),
+      (5L, baseProperties("深圳市腾讯计算机系统有限公司", 0.0, Map(99999L -> investmentInfo()))),
+      (6L, baseProperties("武汉鲨鱼网络直播技术有限公司", 0.0, Map(99999L -> investmentInfo()))),
+      (7L, baseProperties("武汉斗鱼网络科技有限公司", 0.0, Map(99999L -> investmentInfo()))),
+      (8L, baseProperties("张文明", 0.0, Map(99999L -> investmentInfo()))),
+      (9L, baseProperties("陈少杰", 0.0, Map(99999L -> investmentInfo()))),
+      (10L, baseProperties("深圳市鲨鱼文化科技有限公司", 0.0, Map(99999L -> investmentInfo()))),
+      (11L, baseProperties("成都霜思文化传播有限公司", 0.0, Map(99999L -> investmentInfo())))
     )
     val vertexSeqRDD: RDD[(VertexId, baseProperties)] = sc.parallelize(vertexSeq)
 
@@ -77,7 +77,7 @@ object G06_CrossShareHolding_v2 {
     val newVertexWithMoney: VertexRDD[baseProperties] = graph.vertices.leftZipJoin(sumMoneyOfCompany)(
       (vid: VertexId, vd: baseProperties, nvd: Option[BigDecimal]) => {
         val sumOfMoney: BigDecimal = nvd.getOrElse(BigDecimal(0.0))
-        baseProperties(vd.name, vd.invType, vd.age, sumOfMoney, vd.oneStepInvInfo)
+        baseProperties(vd.name, sumOfMoney, vd.oneStepInvInfo)
         // 名称、类型、年龄、总注册资本、Map(一阶投资信息)
       }
     )
@@ -121,7 +121,7 @@ object G06_CrossShareHolding_v2 {
     val newVertexWithInvInfo: VertexRDD[baseProperties] = newGraph.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
         val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(Map(99999L -> investmentInfo())) // 设立一个空属性
-        baseProperties(vd.name, vd.invType, vd.age, vd.registeredCapital, mapOfInvProportion)
+        baseProperties(vd.name, vd.registeredCapital, mapOfInvProportion)
         // 名称、类型、年龄【自然人】、总注册资本【法人】、投资占比
       }
     )

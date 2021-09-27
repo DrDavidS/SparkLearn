@@ -16,15 +16,15 @@ object G099_CrossShareHolding_DCG_v1 {
     // 定义默认信息，以防止某些边与未知用户出现关系
     // 或者供 getOrElse 使用
     val defaultInvestmentInfo = Map(99999L -> investmentInfo())
-    val defaultVertex: baseProperties = baseProperties("default_com_name", "其他", "999", 0.0, defaultInvestmentInfo)
+    val defaultVertex: baseProperties = baseProperties("default_com_name", 0.0, defaultInvestmentInfo)
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
-      (1L, baseProperties("青毛狮子怪", "妖怪", "500", 0.0, defaultInvestmentInfo)),
-      (2L, baseProperties("大鹏金翅雕", "妖怪", "500", 0.0, defaultInvestmentInfo)),
-      (3L, baseProperties("狮驼岭左护法有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
-      (4L, baseProperties("狮驼岭右护法有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
-      (5L, baseProperties("狮驼岭小钻风巡山有限公司", "法人", "0", 0.0, defaultInvestmentInfo))
+      (1L, baseProperties("青毛狮子怪", 0.0, defaultInvestmentInfo)),
+      (2L, baseProperties("大鹏金翅雕", 0.0, defaultInvestmentInfo)),
+      (3L, baseProperties("狮驼岭左护法有限公司", 0.0, defaultInvestmentInfo)),
+      (4L, baseProperties("狮驼岭右护法有限公司", 0.0, defaultInvestmentInfo)),
+      (5L, baseProperties("狮驼岭小钻风巡山有限公司", 0.0, defaultInvestmentInfo))
     )
     val vertexSeqRDD: RDD[(VertexId, baseProperties)] = sc.parallelize(vertexSeq)
 
@@ -64,7 +64,7 @@ object G099_CrossShareHolding_DCG_v1 {
     val newVertexWithMoney: VertexRDD[baseProperties] = graph.vertices.leftZipJoin(sumMoneyOfCompany)(
       (vid: VertexId, vd: baseProperties, nvd: Option[BigDecimal]) => {
         val sumOfMoney: BigDecimal = nvd.getOrElse(BigDecimal(0.0))
-        baseProperties(vd.name, vd.invType, vd.age, sumOfMoney, vd.oneStepInvInfo)
+        baseProperties(vd.name, sumOfMoney, vd.oneStepInvInfo)
         // 名称、类型、年龄、总注册资本、Map(一阶投资信息)
       }
     )
@@ -107,7 +107,7 @@ object G099_CrossShareHolding_DCG_v1 {
     val newVertexWithInvInfo: VertexRDD[baseProperties] = newGraph.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
         val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
-        baseProperties(vd.name, vd.invType, vd.age, vd.registeredCapital, mapOfInvProportion)
+        baseProperties(vd.name, vd.registeredCapital, mapOfInvProportion)
         // 名称、类型、年龄【自然人】、总注册资本【法人】、投资占比
       }
     )
@@ -150,7 +150,7 @@ object G099_CrossShareHolding_DCG_v1 {
             // 相乘，并限制精度
             val mulLevelProportionOfInvestment: String = (srcProportionOfInvestment * dstProportionOfInvestment).formatted("%.6f")
             // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
-            val srcLinkDstLevel:Int = dstLevel + 1
+            val srcLinkDstLevel: Int = dstLevel + 1
             // 放回Map
             val investmentMap = Map(dstInvestComID ->
               investmentInfo(
@@ -158,7 +158,7 @@ object G099_CrossShareHolding_DCG_v1 {
                 , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比
                 , registeredCapital = dstInvestComRegisteredCapital // 总注册资本
                 , upperStreamId = srcID // 上游股东id
-                , level = srcLinkDstLevel  // 层级间隔
+                , level = srcLinkDstLevel // 层级间隔
               ))
             // 当前只有多级的投资Map，需要和旧Map合并起来
             val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
@@ -180,8 +180,6 @@ object G099_CrossShareHolding_DCG_v1 {
           val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
           baseProperties(
             vd.name, // 姓名
-            vd.invType, // 投资方类型——自然人or法人
-            vd.age, // 投资人年龄（自然人）
             vd.registeredCapital, // 注册资本
             mapOfInvProportion) // 持股信息
         }
@@ -213,7 +211,7 @@ object G099_CrossShareHolding_DCG_v1 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(6)  // 经过测试，递归次数增加不影响结果
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(6) // 经过测试，递归次数增加不影响结果
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }

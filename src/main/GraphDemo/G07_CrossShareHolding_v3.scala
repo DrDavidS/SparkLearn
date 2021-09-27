@@ -14,21 +14,21 @@ object G07_CrossShareHolding_v3 {
     // 定义默认信息，以防止某些边与未知用户出现关系
     // 或者供 getOrElse 使用
     val defaultInvestmentInfo = Map(99999L -> investmentInfo())
-    val defaultVertex: baseProperties = baseProperties("default_com_name", "其他", "999", 0.0, defaultInvestmentInfo)
+    val defaultVertex: baseProperties = baseProperties("default_com_name", 0.0, defaultInvestmentInfo)
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
-      (1L, baseProperties("马化腾", "自然人", "50", 0.0, defaultInvestmentInfo)),
-      (2L, baseProperties("陈一丹", "自然人", "50", 0.0, defaultInvestmentInfo)),
-      (3L, baseProperties("许晨晔", "自然人", "52", 0.0, defaultInvestmentInfo)),
-      (4L, baseProperties("张志东", "自然人", "49", 0.0, defaultInvestmentInfo)),
-      (5L, baseProperties("深圳市腾讯计算机系统有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
-      (6L, baseProperties("武汉鲨鱼网络直播技术有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
-      (7L, baseProperties("武汉斗鱼网络科技有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
-      (8L, baseProperties("张文明", "自然人", "42", 0.0, defaultInvestmentInfo)),
-      (9L, baseProperties("陈少杰", "自然人", "39", 0.0, defaultInvestmentInfo)),
-      (10L, baseProperties("深圳市鲨鱼文化科技有限公司", "法人", "0", 0.0, defaultInvestmentInfo)),
-      (11L, baseProperties("成都霜思文化传播有限公司", "法人", "0", 0.0, defaultInvestmentInfo))
+      (1L, baseProperties("马化腾",  0.0, defaultInvestmentInfo)),
+      (2L, baseProperties("陈一丹", 0.0, defaultInvestmentInfo)),
+      (3L, baseProperties("许晨晔",  0.0, defaultInvestmentInfo)),
+      (4L, baseProperties("张志东",  0.0, defaultInvestmentInfo)),
+      (5L, baseProperties("深圳市腾讯计算机系统有限公司",  0.0, defaultInvestmentInfo)),
+      (6L, baseProperties("武汉鲨鱼网络直播技术有限公司",  0.0, defaultInvestmentInfo)),
+      (7L, baseProperties("武汉斗鱼网络科技有限公司",  0.0, defaultInvestmentInfo)),
+      (8L, baseProperties("张文明",  0.0, defaultInvestmentInfo)),
+      (9L, baseProperties("陈少杰",  0.0, defaultInvestmentInfo)),
+      (10L, baseProperties("深圳市鲨鱼文化科技有限公司",  0.0, defaultInvestmentInfo)),
+      (11L, baseProperties("成都霜思文化传播有限公司",  0.0, defaultInvestmentInfo))
     )
     val vertexSeqRDD: RDD[(VertexId, baseProperties)] = sc.parallelize(vertexSeq)
 
@@ -79,7 +79,7 @@ object G07_CrossShareHolding_v3 {
     val newVertexWithMoney: VertexRDD[baseProperties] = graph.vertices.leftZipJoin(sumMoneyOfCompany)(
       (vid: VertexId, vd: baseProperties, nvd: Option[BigDecimal]) => {
         val sumOfMoney: BigDecimal = nvd.getOrElse(BigDecimal(0.0))
-        baseProperties(vd.name, vd.invType, vd.age, sumOfMoney, vd.oneStepInvInfo)
+        baseProperties(vd.name, sumOfMoney, vd.oneStepInvInfo)
         // 名称、类型、年龄、总注册资本、Map(一阶投资信息)
       }
     )
@@ -125,7 +125,7 @@ object G07_CrossShareHolding_v3 {
     val newVertexWithInvInfo: VertexRDD[baseProperties] = newGraph.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
         val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
-        baseProperties(vd.name, vd.invType, vd.age, vd.registeredCapital, mapOfInvProportion)
+        baseProperties(vd.name, vd.registeredCapital, mapOfInvProportion)
         // 名称、类型、年龄【自然人】、总注册资本【法人】、投资占比
       }
     )
@@ -253,8 +253,6 @@ object G07_CrossShareHolding_v3 {
         val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
         baseProperties(
           vd.name, // 姓名
-          vd.invType, // 投资方类型——自然人or法人
-          vd.age, // 投资人年龄（自然人）
           vd.registeredCapital, // 注册资本
           mapOfInvProportion) // 持股信息
       }
