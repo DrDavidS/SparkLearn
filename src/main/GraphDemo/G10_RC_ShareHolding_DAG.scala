@@ -123,7 +123,7 @@ object G10_RC_ShareHolding_DAG {
 
     /**
      *
-     * @param OldGraph 输入老的Graph，比如原始图或者一阶Graph
+     * @param OldGraph 输入老的Graph，这里特指上面的一阶 Graph
      * @return 返回多层持股关系的新图，这里是一层
      */
     def nStepShareHoldingCalculate(OldGraph: Graph[baseProperties, Double]): Graph[baseProperties, Double] = {
@@ -166,18 +166,23 @@ object G10_RC_ShareHolding_DAG {
             val mulLevelProportionOfInvestment: String = (srcProportionOfInvestment * dstProportionOfInvestment).formatted("%.6f")
             // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
             val srcLinkDstLevel: Int = dstLevel + 1
+
             // 放回Map暂存，等待发送
-            val investmentMap = Map(dstInvestComID ->  // 5L
+            // 注意这里 investmentMap 的 addSign 需要设置为 true
+            val investmentMap = Map(dstInvestComID -> // 5L
               investmentInfo(
                 investedComName = dstInvestComName // 被投资企业名称：狮驼岭小钻风巡山有限公司
                 , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比：0.675325
                 , registeredCapital = dstInvestComRegisteredCapital // 总注册资本：770万
                 , upperStreamId = srcID // 边上游股东id：6L
                 , level = srcLinkDstLevel // 层级间隔：2
-                , addSign = true  // 后面reduce需要合并，这里改为true
+                , addSign = true // 后面reduce需要合并，这里改为true
               ))
             val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
-            triplet.sendToSrc(newUnionOldInvestmentMap)
+            // TODO 多做一次判断，什么情况下src和dst不用发消息了，避免空循环的时候重复计算，提高性能
+            if (true) {
+              triplet.sendToSrc(newUnionOldInvestmentMap)
+            }
           }
           )
         },
@@ -185,23 +190,42 @@ object G10_RC_ShareHolding_DAG {
         // https://stackoverflow.com/questions/7076128/best-way-to-merge-two-maps-and-sum-the-values-of-same-key
         (leftMap: Map[VertexId, investmentInfo], rightMap: Map[VertexId, investmentInfo]) => {
 
-          println("leftMap   " + leftMap)
-          println("rightMap  " + rightMap)
-          println("\n============\n")
-          // TODO 这里要做的就是增加一个true false 判断
-          leftMap ++ rightMap.map {
+          // TODO 这里要做的就是增加一个 addSign -> true or false 判断
+          val reduceLeftAndRightMap: Map[VertexId, investmentInfo] = leftMap ++ rightMap.map {
             case (k: VertexId, v: investmentInfo) =>
               // 左右投资比例相加
               val sumOfProportion: BigDecimal = {
                 BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
               }
-              k -> investmentInfo(
-                investedComName = v.investedComName // 被投资企业名称
-                , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比
-                , registeredCapital = v.registeredCapital // 总注册资本
-                , upperStreamId = v.upperStreamId // 上游股东id
-                , level = v.level // 层级间隔
-              )
+              if (v.addSign) {
+                k -> investmentInfo(
+                  investedComName = v.investedComName // 被投资企业名称
+                  , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比求和
+                  , registeredCapital = v.registeredCapital // 总注册资本
+                  , upperStreamId = v.upperStreamId // 上游股东id
+                  , level = v.level // 层级间隔
+                )
+              }
+              else {
+                k -> investmentInfo(
+                  investedComName = v.investedComName // 被投资企业名称
+                  , proportionOfInvestment = v.proportionOfInvestment // 原始投资占比
+                  , registeredCapital = v.registeredCapital // 总注册资本
+                  , upperStreamId = v.upperStreamId // 上游股东id
+                  , level = v.level // 层级间隔
+                )
+              }
+          }
+
+          // 由于上面的 ++ 过程漏了 leftMap 的 addSign 设置，所以需要全部重置一遍false才行
+          reduceLeftAndRightMap.map { case (k2, v2) =>
+            k2 -> investmentInfo(
+              investedComName = v2.investedComName // 被投资企业名称
+              , proportionOfInvestment = v2.proportionOfInvestment // 原始投资占比
+              , registeredCapital = v2.registeredCapital // 总注册资本
+              , upperStreamId = v2.upperStreamId // 上游股东id
+              , level = v2.level // 层级间隔
+            )
           }
         }
       )
@@ -210,6 +234,9 @@ object G10_RC_ShareHolding_DAG {
        * STEP6 又来一次Join，把二级投资的 Map 弄进去
        *
        */
+
+      // 先统统设置一波false
+
       val newVertexWithMulLevelInvestInfo: VertexRDD[baseProperties] = OldGraph.vertices.leftZipJoin(nStepOfShareHolding)(
         (vid: VertexId, vd: baseProperties, nvd: Option[Map[VertexId, investmentInfo]]) => {
           val mapOfInvProportion: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
@@ -246,7 +273,7 @@ object G10_RC_ShareHolding_DAG {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(1) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(7) // 理论上递归次数增加不影响结果才是对的
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
