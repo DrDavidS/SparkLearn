@@ -5,16 +5,13 @@ import org.apache.spark.rdd.RDD
 import scala.annotation.tailrec
 
 /**
- * Graph Demo 11 多边持股判断
+ * Graph Demo 12 多边持股判断
  *
- * 这里我们进行了一项优化，就是只发送需要相加的股权，而把旧有的股权和新相加的股权Map的合并
- * 放在了 aggMsg 之后的 leftZipJoin 阶段。
- *
- * 接下来在 G12 中，我们会继续优化掉 foreach 步骤，用 map 来代替
+ * 继续优化掉 foreach 步骤，用 map 来代替
  *
  */
 
-object G11_RC_ShareHolding_DAG {
+object G12_RC_ShareHolding_DAG {
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis()
     val sc: SparkContext = SparkLocalConf().sc
@@ -133,56 +130,44 @@ object G11_RC_ShareHolding_DAG {
         (triplet: EdgeContext[baseProperties, Double, Map[VertexId, investmentInfo]]) => {
           val srcInvestInfo: Map[VertexId, investmentInfo] = triplet.srcAttr.oneStepInvInfo
           val dstInvestInfo: Map[VertexId, investmentInfo] = triplet.dstAttr.oneStepInvInfo
-          // TODO 把 foreach 替换为 map，提高效率
-          dstInvestInfo.foreach((kv: (VertexId, investmentInfo)) => {
-            // dstInvestInfo 的上游id，去srcInvestInfo里面查询
 
-            // 下游顶点之下被投资企业的ID：5L
-            val dstInvestComID: VertexId = kv._1
-            // 下游顶点之下被投资企业的名称：狮驼岭小钻风巡山有限公司
-            val dstInvestComName: String = kv._2.investedComName
-            // 下游顶点下面被投资企业的注册资本：770万
-            val dstInvestComRegisteredCapital: BigDecimal = kv._2.registeredCapital
-            // 上游顶点企业:6L
-            val srcID: VertexId = triplet.srcId
-            // 上游顶点对下游顶点的投资信息
-            /*
-            Map(
-                  3 -> investmentInfo(狮驼岭左护法有限公司,1.000000,177.0,6,1),
-                  4 -> investmentInfo(狮驼岭右护法有限公司,1.000000,125.0,6,1)
-                )
-             */
-            val srcLinkDstInfo: investmentInfo = srcInvestInfo.getOrElse(kv._2.upperStreamId, investmentInfo())
-            // 层级间隔，下游顶点到再下游被投资企业的层级
-            // 1
-            val dstLevel: Int = kv._2.level
+          dstInvestInfo.map {
+            case (k: VertexId, v: investmentInfo) => {
+              // 下游顶点之下被投资企业的ID
+              val dstInvestComID: VertexId = k
+              // 下游顶点之下被投资企业的名称
+              val dstInvestComName: String = v.investedComName
+              // 下游顶点下面被投资企业的注册资本
+              val dstInvestComRegisteredCapital: BigDecimal = v.registeredCapital
+              // 上游顶点企业
+              val srcID: VertexId = triplet.srcId
+              // 上游顶点对下游顶点的投资信息
+              val srcLinkDstInfo: investmentInfo = srcInvestInfo.getOrElse(v.upperStreamId, investmentInfo())
+              // 层级间隔，下游顶点到再下游被投资企业的层级
+              val dstLevel: Int = v.level
+              // 上游顶点对下游顶点的投资比例
+              val srcProportionOfInvestment: BigDecimal = BigDecimal(srcLinkDstInfo.proportionOfInvestment)
+              // 下游顶点对下面的公司的投资比例
+              val dstProportionOfInvestment: BigDecimal = BigDecimal(v.proportionOfInvestment)
+              // 相乘，并限制精度。得到上游顶点对下游顶点下面的公司的投资比例
+              val mulLevelProportionOfInvestment: String = (srcProportionOfInvestment * dstProportionOfInvestment).formatted("%.6f")
+              // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
+              val srcLinkDstLevel: Int = dstLevel + 1
 
-            // 上游顶点对下游顶点的投资比例
-            // 狮驼岭 -> 右护法：1.000000
-            val srcProportionOfInvestment: BigDecimal = BigDecimal(srcLinkDstInfo.proportionOfInvestment)
-            // 下游顶点对下面的公司的投资比例
-            // 右护法 -> 小钻风：0.675325
-            val dstProportionOfInvestment: BigDecimal = BigDecimal(kv._2.proportionOfInvestment)
-            // 相乘，并限制精度。得到上游顶点对下游顶点下面的公司的投资比例
-            // 0.675325
-            val mulLevelProportionOfInvestment: String = (srcProportionOfInvestment * dstProportionOfInvestment).formatted("%.6f")
-            // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
-            val srcLinkDstLevel: Int = dstLevel + 1
-
-            // 放回Map暂存，等待发送
-            // 注意这里 investmentMap 的 addSign 需要设置为 true
-            val investmentMap = Map(dstInvestComID -> // 5L
-              investmentInfo(
-                investedComName = dstInvestComName // 被投资企业名称：狮驼岭小钻风巡山有限公司
-                , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比：0.675325
-                , registeredCapital = dstInvestComRegisteredCapital // 总注册资本：770万
-                , upperStreamId = srcID // 边上游股东id：6L
-                , level = srcLinkDstLevel // 层级间隔：2
-                , addSign = true // 后面reduce需要合并，这里改为true
-              ))
-            triplet.sendToSrc(investmentMap)
+              // 放回Map暂存，等待发送
+              // 注意这里 investmentMap 的 addSign 需要设置为 true
+              val investmentMap = Map(dstInvestComID -> // 5L
+                investmentInfo(
+                  investedComName = dstInvestComName // 被投资企业名称：狮驼岭小钻风巡山有限公司
+                  , proportionOfInvestment = mulLevelProportionOfInvestment // 投资占比：0.675325
+                  , registeredCapital = dstInvestComRegisteredCapital // 总注册资本：770万
+                  , upperStreamId = srcID // 边上游股东id：6L
+                  , level = srcLinkDstLevel // 层级间隔：2
+                  , addSign = true // 后面reduce需要合并，这里改为true
+                ))
+              triplet.sendToSrc(investmentMap)
+            }
           }
-          )
         },
         // Reduce
         // https://stackoverflow.com/questions/7076128/best-way-to-merge-two-maps-and-sum-the-values-of-same-key
@@ -192,16 +177,16 @@ object G11_RC_ShareHolding_DAG {
             case (k: VertexId, v: investmentInfo) =>
               // 左右投资比例相加
 
-                val sumOfProportion: BigDecimal = {
-                  BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
-                }
-                k -> investmentInfo(
-                  investedComName = v.investedComName // 被投资企业名称
-                  , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比求和
-                  , registeredCapital = v.registeredCapital // 总注册资本
-                  , upperStreamId = v.upperStreamId // 上游股东id
-                  , level = v.level // 层级间隔
-                )
+              val sumOfProportion: BigDecimal = {
+                BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
+              }
+              k -> investmentInfo(
+                investedComName = v.investedComName // 被投资企业名称
+                , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比求和
+                , registeredCapital = v.registeredCapital // 总注册资本
+                , upperStreamId = v.upperStreamId // 上游股东id
+                , level = v.level // 层级间隔
+              )
           }
           reduceLeftAndRightMap
         }
@@ -255,7 +240,7 @@ object G11_RC_ShareHolding_DAG {
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
     val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(50) // 理论上递归次数增加不影响结果才是对的
     val endTime = System.currentTimeMillis()
-    println("G11运行时间： " + (endTime - startTime))
+    println("G12运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }

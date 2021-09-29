@@ -14,6 +14,7 @@ import scala.collection.immutable
 
 object G10_RC_ShareHolding_DAG {
   def main(args: Array[String]): Unit = {
+    val startTime = System.currentTimeMillis()
     val sc: SparkContext = SparkLocalConf().sc
 
     // 定义默认信息，以防止某些边与未知用户出现关系
@@ -272,7 +273,9 @@ object G10_RC_ShareHolding_DAG {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(3) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(50) // 理论上递归次数增加不影响结果才是对的
+    val endTime = System.currentTimeMillis()
+    println("G10运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
