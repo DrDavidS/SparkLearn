@@ -3,6 +3,7 @@ import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 
 import scala.annotation.tailrec
+import scala.collection.immutable
 
 /**
  * Graph Demo 09 多边持股判断
@@ -119,8 +120,6 @@ object G10_RC_ShareHolding_DAG {
     // 新建一张图 oneStepInvInfoGraph
     val oneStepInvInfoGraph: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
 
-    // TODO: 简化代码，把上面的内容整合进 nStepShareHoldingCalculate
-
     /**
      *
      * @param OldGraph 输入老的Graph，这里特指上面的一阶 Graph
@@ -179,10 +178,7 @@ object G10_RC_ShareHolding_DAG {
                 , addSign = true // 后面reduce需要合并，这里改为true
               ))
             val newUnionOldInvestmentMap: Map[VertexId, investmentInfo] = srcInvestInfo ++ investmentMap
-            // TODO 多做一次判断，什么情况下src和dst不用发消息了，避免空循环的时候重复计算，提高性能
-            if (true) {
-              triplet.sendToSrc(newUnionOldInvestmentMap)
-            }
+            triplet.sendToSrc(newUnionOldInvestmentMap)
           }
           )
         },
@@ -190,14 +186,17 @@ object G10_RC_ShareHolding_DAG {
         // https://stackoverflow.com/questions/7076128/best-way-to-merge-two-maps-and-sum-the-values-of-same-key
         (leftMap: Map[VertexId, investmentInfo], rightMap: Map[VertexId, investmentInfo]) => {
 
-          // TODO 这里要做的就是增加一个 addSign -> true or false 判断
           val reduceLeftAndRightMap: Map[VertexId, investmentInfo] = leftMap ++ rightMap.map {
             case (k: VertexId, v: investmentInfo) =>
-              // 左右投资比例相加
-              val sumOfProportion: BigDecimal = {
-                BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
-              }
-              if (v.addSign) {
+              // 相加标记
+              val leftMapAddSign: Boolean = leftMap.getOrElse(k, investmentInfo()).addSign
+              val rightMapAddSign: Boolean = v.addSign
+
+              if (rightMapAddSign && leftMapAddSign) {
+                val sumOfProportion: BigDecimal = {
+                  BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
+                }
+
                 k -> investmentInfo(
                   investedComName = v.investedComName // 被投资企业名称
                   , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比求和
@@ -273,7 +272,7 @@ object G10_RC_ShareHolding_DAG {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(7) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(3) // 理论上递归次数增加不影响结果才是对的
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
