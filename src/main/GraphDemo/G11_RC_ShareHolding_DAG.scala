@@ -5,9 +5,12 @@ import org.apache.spark.rdd.RDD
 import scala.annotation.tailrec
 
 /**
- * Graph Demo 09 多边持股判断
+ * Graph Demo 11 多边持股判断
  *
- * 重制DAG
+ * 这里我们进行了一项优化，就是只发送需要相加的股权，而把旧有的股权和新相加的股权Map的合并
+ * 放在了 aggMsg 之后的 leftZipJoin 阶段。
+ *
+ * 接下来在 G12 中，我们会继续优化掉 foreach 步骤，用 map 来代替
  *
  */
 
