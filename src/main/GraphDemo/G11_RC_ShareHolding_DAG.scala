@@ -199,17 +199,7 @@ object G11_RC_ShareHolding_DAG {
                   , level = v.level // 层级间隔
                 )
           }
-
-          // 由于上面的 ++ 过程漏了 leftMap 的 addSign 设置，所以需要全部重置一遍false才行
-          reduceLeftAndRightMap.map { case (k2, v2) =>
-            k2 -> investmentInfo(
-              investedComName = v2.investedComName // 被投资企业名称
-              , proportionOfInvestment = v2.proportionOfInvestment // 原始投资占比
-              , registeredCapital = v2.registeredCapital // 总注册资本
-              , upperStreamId = v2.upperStreamId // 上游股东id
-              , level = v2.level // 层级间隔
-            )
-          }
+          reduceLeftAndRightMap
         }
       )
 
