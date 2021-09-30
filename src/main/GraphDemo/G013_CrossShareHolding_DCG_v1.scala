@@ -2,7 +2,6 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 
-import java.io
 import scala.annotation.tailrec
 
 /**
@@ -10,7 +9,7 @@ import scala.annotation.tailrec
  *
  */
 
-object G099_CrossShareHolding_DCG_v1 {
+object G013_CrossShareHolding_DCG_v1 {
   def main(args: Array[String]): Unit = {
     val startTime: Long = System.currentTimeMillis()
     val sc: SparkContext = SparkLocalConf().sc
@@ -116,8 +115,6 @@ object G099_CrossShareHolding_DCG_v1 {
     )
     // 新建一张图 oneStepInvInfoGraph
     val oneStepInvInfoGraph: Graph[baseProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
-    //    println("=== oneStepInvInfoGraph 一阶数据 ===")
-    //    oneStepInvInfoGraph.vertices.collect.foreach(println)
 
     /**
      *
@@ -164,7 +161,14 @@ object G099_CrossShareHolding_DCG_v1 {
                   , level = srcLinkDstLevel // 层级间隔：2
                   , addSign = true // 后面reduce需要合并，这里改为true
                 ))
-              triplet.sendToSrc(investmentMap)
+
+              // TODO 这里多发了消息
+              if (dstInvestComID != srcID) {
+                // 成环处理
+                triplet.sendToSrc(investmentMap)
+              } else {
+                println("========== 发现成环 ========")
+              }
           }
         },
         // Reduce
@@ -204,28 +208,15 @@ object G099_CrossShareHolding_DCG_v1 {
           val oldGraphInvInfo: Map[VertexId, investmentInfo] = vd.oneStepInvInfo
           val newGraphInvInfo: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo)
 
-
-          if (vid == 4) println("\n======== 当前Vid ========")
-          if (vid == 4) println(vid + " ==> old: " + oldGraphInvInfo)
-          if (vid == 4) println(vid + " ==> new: " + newGraphInvInfo)
-
           // 新老信息Map的值同Key，相加，应对环状情况
 
           val cycleAddGraphInvInfo: Map[VertexId, investmentInfo] = oldGraphInvInfo ++ newGraphInvInfo.map {
             case (k, v) =>
-              if (vid == k) {
-                if (vid == 4) println("遇到右护法对自己持股了 -->" + k)
-                // 新比例加上旧比例
+              // 新比例加上旧比例
+              if (k != vid) {
                 val sumOfSelfCycle: BigDecimal = BigDecimal(v.proportionOfInvestment) + BigDecimal(oldGraphInvInfo
                   .getOrElse(k, investmentInfo())
                   .proportionOfInvestment)
-
-                if (vid == 4) println("上一轮对自身持股：" + oldGraphInvInfo
-                  .getOrElse(k, investmentInfo())
-                  .proportionOfInvestment)
-                if (vid == 4) println("这一轮对自身持股：" + v.proportionOfInvestment)
-                if (vid == 4) println("加起来等于：" + sumOfSelfCycle)
-
 
                 k -> investmentInfo(
                   investedComName = v.investedComName // 被投资企业名称
@@ -244,12 +235,10 @@ object G099_CrossShareHolding_DCG_v1 {
                 )
               }
           }
-
           val currentVertexInfo: baseProperties = baseProperties(
             vd.name, // 姓名
             vd.registeredCapital, // 注册资本
             cycleAddGraphInvInfo) // 持股信息 新老合并
-          if (vid == 1) println("狮子怪--新老合并后的持股信息：" + currentVertexInfo)
           currentVertexInfo
         }
       )
@@ -282,7 +271,7 @@ object G099_CrossShareHolding_DCG_v1 {
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
     val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(7) // 理论上递归次数增加不影响结果才是对的
     val endTime: Long = System.currentTimeMillis()
-    println("G12运行时间： " + (endTime - startTime))
+    println("G13运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }
