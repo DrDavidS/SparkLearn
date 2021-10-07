@@ -177,9 +177,9 @@ object G12_RC_ShareHolding_DAG {
             case (k: VertexId, v: investmentInfo) =>
               // 左右投资比例相加
 
-              val sumOfProportion: BigDecimal = {
+              val sumOfProportion: BigDecimal =
                 BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
-              }
+
               k -> investmentInfo(
                 investedComName = v.investedComName // 被投资企业名称
                 , proportionOfInvestment = sumOfProportion.formatted("%.6f") // 投资占比求和

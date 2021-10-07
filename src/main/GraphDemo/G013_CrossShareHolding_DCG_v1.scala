@@ -164,7 +164,8 @@ object G013_CrossShareHolding_DCG_v1 {
                   , addSign = true // 后面reduce需要合并，这里改为true
                 ))
 
-              // TODO 这里多发了消息？
+              // TODO 这里多发了消息
+              // 考虑改进方法：如果没有成环只发一次消息？
               if (true) {
                 // 成环处理
                 triplet.sendToSrc(investmentMap)
@@ -210,45 +211,19 @@ object G013_CrossShareHolding_DCG_v1 {
           val oldGraphInvInfo: Map[VertexId, investmentInfo] = vd.oneStepInvInfo
           val newGraphInvInfo: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo)
 
-          // 新老信息Map的值同Key，相加，应对环状情况
-
-          val cycleAddGraphInvInfo: Map[VertexId, investmentInfo] = oldGraphInvInfo ++ newGraphInvInfo.map {
-            case (k, v) =>
-              // 新比例加上旧比例
-              if (k != vid) {
-                val sumOfSelfCycle: BigDecimal = BigDecimal(v.proportionOfInvestment) + BigDecimal(oldGraphInvInfo
-                  .getOrElse(k, investmentInfo())
-                  .proportionOfInvestment)
-
-                k -> investmentInfo(
-                  investedComName = v.investedComName // 被投资企业名称
-                  , proportionOfInvestment = sumOfSelfCycle.formatted("%.6f") // 投资占比求和
-                  , registeredCapital = v.registeredCapital // 总注册资本
-                  , upperStreamId = v.upperStreamId // 上游股东id
-                  , level = v.level // 层级间隔
-                )
-              } else {
-                k -> investmentInfo(
-                  investedComName = v.investedComName // 被投资企业名称
-                  , proportionOfInvestment = v.proportionOfInvestment // 投资占比求和
-                  , registeredCapital = v.registeredCapital // 总注册资本
-                  , upperStreamId = v.upperStreamId // 上游股东id
-                  , level = v.level // 层级间隔
-                )
-              }
-          }
-          val currentVertexInfo: baseProperties = baseProperties(
+          baseProperties(
             vd.name, // 姓名
             vd.registeredCapital, // 注册资本
-            cycleAddGraphInvInfo) // 持股信息 新老合并
-          currentVertexInfo
+            oldGraphInvInfo ++ newGraphInvInfo) // 持股信息 新老合并
         }
       )
+
+
       // 新建一张图 thirdNewGraph
       val nStepNewGraph: Graph[baseProperties, Double] = Graph(newVertexWithMulLevelInvestInfo, graph.edges, defaultVertex)
 
-      println("\n======== 本次递归后的各节点信息 =======")
-      nStepNewGraph.vertices.collect.foreach(println)
+//      println("\n======== 本次递归后的各节点信息 =======")
+//      nStepNewGraph.vertices.collect.foreach(println)
       nStepNewGraph
     }
 
@@ -274,9 +249,9 @@ object G013_CrossShareHolding_DCG_v1 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(3) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(2) // 理论上递归次数增加不影响结果才是对的
     val endTime: Long = System.currentTimeMillis()
-    println("G13运行时间： " + (endTime - startTime))
+    println("\nG13运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
   }
 }

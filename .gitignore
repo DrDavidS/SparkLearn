@@ -3,3 +3,4 @@
 *.iml
 /logs/root.log
 /logs/bagedate.log
+.idea/.name
