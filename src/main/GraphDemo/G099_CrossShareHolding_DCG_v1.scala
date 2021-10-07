@@ -2,11 +2,11 @@ import org.apache.spark.SparkContext
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 
-import java.io
 import scala.annotation.tailrec
 
 /**
- * Graph Demo 在G07的基础上，把图做得更复杂一些
+ * Graph Demo 有向有环图
+ *
  *
  */
 

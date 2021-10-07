@@ -5,7 +5,9 @@ import org.apache.spark.rdd.RDD
 import scala.annotation.tailrec
 
 /**
- * Graph Demo 在G07的基础上，把图做得更复杂一些
+ * Graph Demo 13 有向有环图
+ *
+ * 在这一节，我们会认真分析如何去做环状图(DCG)计算
  *
  */
 
@@ -162,8 +164,8 @@ object G013_CrossShareHolding_DCG_v1 {
                   , addSign = true // 后面reduce需要合并，这里改为true
                 ))
 
-              // TODO 这里多发了消息
-              if (dstInvestComID != srcID) {
+              // TODO 这里多发了消息？
+              if (true) {
                 // 成环处理
                 triplet.sendToSrc(investmentMap)
               } else {
@@ -244,6 +246,9 @@ object G013_CrossShareHolding_DCG_v1 {
       )
       // 新建一张图 thirdNewGraph
       val nStepNewGraph: Graph[baseProperties, Double] = Graph(newVertexWithMulLevelInvestInfo, graph.edges, defaultVertex)
+
+      println("\n======== 本次递归后的各节点信息 =======")
+      nStepNewGraph.vertices.collect.foreach(println)
       nStepNewGraph
     }
 
@@ -269,7 +274,7 @@ object G013_CrossShareHolding_DCG_v1 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(7) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(3) // 理论上递归次数增加不影响结果才是对的
     val endTime: Long = System.currentTimeMillis()
     println("G13运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
