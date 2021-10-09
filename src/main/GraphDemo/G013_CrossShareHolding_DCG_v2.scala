@@ -5,13 +5,13 @@ import org.apache.spark.rdd.RDD
 import scala.annotation.tailrec
 
 /**
- * Graph Demo 13 有向有环图
+ * Graph Demo 14 有向有环图
  *
- * 在这一节，我们会认真分析如何去做环状图(DCG)计算
+ * 究极简化版
  *
  */
 
-object G013_CrossShareHolding_DCG_v1 {
+object G013_CrossShareHolding_DCG_v2 {
   def main(args: Array[String]): Unit = {
     val startTime: Long = System.currentTimeMillis()
     val sc: SparkContext = SparkLocalConf().sc
@@ -25,8 +25,14 @@ object G013_CrossShareHolding_DCG_v1 {
     val vertexSeq = Seq(
       (1L, baseProperties("青毛狮子怪", 0.0, defaultInvestmentInfo)),
       (2L, baseProperties("大鹏金翅雕", 0.0, defaultInvestmentInfo)),
-      (3L, baseProperties("狮驼岭左护法有限公司", 0.0, defaultInvestmentInfo)),
-      (4L, baseProperties("狮驼岭右护法有限公司", 0.0, defaultInvestmentInfo))
+      (3L, baseProperties("3 左护法", 0.0, defaultInvestmentInfo)),
+      (5L, baseProperties("5 左护法", 0.0, defaultInvestmentInfo)),
+      (6L, baseProperties("6 左护法", 0.0, defaultInvestmentInfo)),
+      (7L, baseProperties("7 左护法", 0.0, defaultInvestmentInfo)),
+      (4L, baseProperties("4 右护法", 0.0, defaultInvestmentInfo)),
+      (8L, baseProperties("8 右护法", 0.0, defaultInvestmentInfo)),
+      (9L, baseProperties("9 右护法", 0.0, defaultInvestmentInfo)),
+      (10L, baseProperties("10 右护法", 0.0, defaultInvestmentInfo)),
     )
     val vertexSeqRDD: RDD[(VertexId, baseProperties)] = sc.parallelize(vertexSeq)
 
@@ -38,8 +44,14 @@ object G013_CrossShareHolding_DCG_v1 {
     val shareEdgeSeq = Seq(
       Edge(1L, 3L, 500.0), // 青毛狮子怪 -> 左护法
       Edge(2L, 4L, 500.0), // 大鹏金翅雕 -> 左护法
-      Edge(3L, 4L, 500.0), // 左护法 -> 右护法
-      Edge(4L, 3L, 500.0), // 右护法 -> 左护法
+      Edge(3L, 5L, 500.0),
+      Edge(5L, 6L, 500.0),
+      Edge(6L, 7L, 500.0),
+      Edge(7L, 4L, 500.0),
+      Edge(4L, 8L, 500.0),
+      Edge(8L, 9L, 500.0),
+      Edge(9L, 10L, 500.0),
+      Edge(10L, 3L, 500.0),
     )
     val shareEdgeRDD: RDD[Edge[Double]] = sc.parallelize(shareEdgeSeq)
 
@@ -165,7 +177,7 @@ object G013_CrossShareHolding_DCG_v1 {
                 ))
 
               // TODO 这里在if条件里面决定是否发消息
-              // 考虑改进方法：如果没有成环只发一次消息？
+              // 考虑改进方法：如果没有成环后只发一次消息？
               if (true) {
                 // 成环处理
                 triplet.sendToSrc(investmentMap)
@@ -174,7 +186,7 @@ object G013_CrossShareHolding_DCG_v1 {
               }
           }
         },
-        // Reduce
+        // 消息聚合阶段
         // https://stackoverflow.com/questions/7076128/best-way-to-merge-two-maps-and-sum-the-values-of-same-key
         (leftMap: Map[VertexId, investmentInfo], rightMap: Map[VertexId, investmentInfo]) => {
 
@@ -182,7 +194,6 @@ object G013_CrossShareHolding_DCG_v1 {
 
             case (k: VertexId, v: investmentInfo) =>
               // 左右投资比例相加
-
               val sumOfProportion: BigDecimal = {
                 BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, investmentInfo()).proportionOfInvestment)
               }
@@ -213,20 +224,25 @@ object G013_CrossShareHolding_DCG_v1 {
           val newGraphInvInfo: Map[VertexId, investmentInfo] = nvd.getOrElse(defaultInvestmentInfo)
 
           // 测试
-          if (vid == 2){
+          if (vid == 2L){
             println("\n=========================")
             println("大鹏旧图： " + oldGraphInvInfo)
             println("大鹏新图： " + newGraphInvInfo)
+          } else if (vid == 4L){
+              println("\n=========================")
+              println("4右护法旧图： " + oldGraphInvInfo)
+              println("4右护法新图： " + newGraphInvInfo)
           }
 
           // 这里简单同Key相加是有问题的，只有old和new同key的value不一致的时候才行
           val sumOfOldAndNewGraphInvInfo: Map[VertexId, investmentInfo] = oldGraphInvInfo ++ newGraphInvInfo.map {
             case (k: VertexId, v: investmentInfo) =>
               // 如果不一致新旧图的value不一致再相加
+              // TODO 检查问题：如果在New环里面出现自己对自己的投资，相加会不会有问题
               if (v.proportionOfInvestment != oldGraphInvInfo.getOrElse(k, investmentInfo()).proportionOfInvestment){
                 val sumOfOldAndNewGraphProportion: BigDecimal =
-                  BigDecimal(v.proportionOfInvestment) + // 新图的同Key投资比例
-                    BigDecimal(oldGraphInvInfo.getOrElse(k, investmentInfo()).proportionOfInvestment) // 老图的同Key投资比例
+                  BigDecimal(v.proportionOfInvestment) +
+                  BigDecimal(oldGraphInvInfo.getOrElse(k, investmentInfo()).proportionOfInvestment)
                 k -> investmentInfo(
                   investedComName = v.investedComName // 被投资企业名称
                   , proportionOfInvestment = sumOfOldAndNewGraphProportion.formatted("%.6f") // 投资占比求和
@@ -283,7 +299,7 @@ object G013_CrossShareHolding_DCG_v1 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(3) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(8) // 理论上递归次数增加不影响结果才是对的
     val endTime: Long = System.currentTimeMillis()
     println("\nG13运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
