@@ -18,20 +18,25 @@ object G014_CrossShareHolding_DCG_SimpleData {
 
     // 默认信息
     val defaultInvestmentInfo = Map(99999L -> simpleInvestmentInfo())
-    val defaultVertex: simpleProperties = simpleProperties("default_com_name", defaultInvestmentInfo)
+    val defaultVertex: simpleProperties = simpleProperties(
+      "default_com_name",
+      defaultInvestmentInfo,
+      defaultInvestmentInfo,
+      defaultInvestmentInfo
+    )
 
     // 创建顶点，包括自然人和法人
     val vertexSeq = Seq(
-      (1L, simpleProperties("青毛狮子怪", defaultInvestmentInfo)),
-      (2L, simpleProperties("大鹏金翅雕", defaultInvestmentInfo)),
-      (3L, simpleProperties("3 左护法", defaultInvestmentInfo)),
-      (5L, simpleProperties("5 左护法", defaultInvestmentInfo)),
-      (6L, simpleProperties("6 左护法", defaultInvestmentInfo)),
-      (7L, simpleProperties("7 左护法", defaultInvestmentInfo)),
-      (4L, simpleProperties("4 右护法", defaultInvestmentInfo)),
-      (8L, simpleProperties("8 右护法", defaultInvestmentInfo)),
-      (9L, simpleProperties("9 右护法", defaultInvestmentInfo)),
-      (10L, simpleProperties("10 右护法", defaultInvestmentInfo)),
+      (1L, simpleProperties("青毛狮子怪", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (2L, simpleProperties("大鹏金翅雕", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (3L, simpleProperties("3 左护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (5L, simpleProperties("5 左护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (6L, simpleProperties("6 左护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (7L, simpleProperties("7 左护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (4L, simpleProperties("4 右护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (8L, simpleProperties("8 右护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (9L, simpleProperties("9 右护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
+      (10L, simpleProperties("10 右护法", defaultInvestmentInfo, defaultInvestmentInfo, defaultInvestmentInfo)),
     )
     val vertexSeqRDD: RDD[(VertexId, simpleProperties)] = sc.parallelize(vertexSeq)
 
@@ -98,11 +103,11 @@ object G014_CrossShareHolding_DCG_SimpleData {
     val newVertexWithInvInfo: VertexRDD[simpleProperties] = graph.vertices.leftZipJoin(proportionOfShareHolding)(
       (vid: VertexId, vd: simpleProperties, nvd: Option[Map[VertexId, simpleInvestmentInfo]]) => {
         val mapOfInvProportion: Map[VertexId, simpleInvestmentInfo] = nvd.getOrElse(defaultInvestmentInfo) // 默认属性
-        simpleProperties(vd.name, mapOfInvProportion) // 名称、投资占比
+        simpleProperties(vd.name, mapOfInvProportion, mapOfInvProportion, defaultInvestmentInfo) // 名称、投资占比、 初始化投资占比，成环时投资占比
       }
     )
-    // 新建一张图 oneStepInvInfoGraph
-    val oneStepInvInfoGraph: Graph[simpleProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
+    // 新建一张图 nStepInvInfoGraph
+    val nStepInvInfoGraph: Graph[simpleProperties, Double] = Graph(newVertexWithInvInfo, graph.edges, defaultVertex)
 
     /**
      *
@@ -112,8 +117,8 @@ object G014_CrossShareHolding_DCG_SimpleData {
     def nStepShareHoldingCalculate(OldGraph: Graph[simpleProperties, Double]): Graph[simpleProperties, Double] = {
       val nStepOfShareHolding: VertexRDD[Map[VertexId, simpleInvestmentInfo]] = OldGraph.aggregateMessages[Map[VertexId, simpleInvestmentInfo]](
         (triplet: EdgeContext[simpleProperties, Double, Map[VertexId, simpleInvestmentInfo]]) => {
-          val srcInvestInfo: Map[VertexId, simpleInvestmentInfo] = triplet.srcAttr.oneStepInvInfo
-          val dstInvestInfo: Map[VertexId, simpleInvestmentInfo] = triplet.dstAttr.oneStepInvInfo
+          val srcInvestInfo: Map[VertexId, simpleInvestmentInfo] = triplet.srcAttr.nStepInvInfo
+          val dstInvestInfo: Map[VertexId, simpleInvestmentInfo] = triplet.dstAttr.nStepInvInfo
 
           dstInvestInfo.map {
             case (k: VertexId, v: simpleInvestmentInfo) =>
@@ -134,23 +139,29 @@ object G014_CrossShareHolding_DCG_SimpleData {
               // 计算当前层级，注意上游顶点和下游顶点的层级间隔肯定是1，而下游顶点到再下游被投资企业的层级则大于等于1，这两个东西相加
               val srcLinkDstLevel: Int = v.level + 1
 
-              // 放回Map暂存，等待发送
-              // 注意这里 investmentMap 的 addSign 需要设置为 true
-              val investmentMap = Map(dstInvestComID -> // 5L
-                simpleInvestmentInfo(
-                  investedComName = dstInvestComName, // 被投资企业名称
-                  proportionOfInvestment = mulLevelProportionOfInvestment, // 投资占比
-                  upperStreamId = srcID, // 边上游股东
-                  level = srcLinkDstLevel, // 层级间隔
-                ))
+              // TODO 删掉true，没用了
+              if (k == triplet.dstId) {
+                // 放回Map暂存，等待发送
+                // 注意这里 investmentMap 的 addSign 需要设置为 true
+                val investmentMapWithoutCycle = Map(dstInvestComID -> // 5L
+                  simpleInvestmentInfo(
+                    investedComName = dstInvestComName, // 被投资企业名称
+                    proportionOfInvestment = mulLevelProportionOfInvestment, // 投资占比
+                    upperStreamId = srcID, // 边上游股东
+                    level = srcLinkDstLevel, // 层级间隔
+                    ifCycle = true
+                  ))
 
-              // TODO 这里在if条件里面决定是否发消息
-              // 考虑改进方法：如果没有成环后只发一次消息？
-              if (true) {
-                // 成环处理
-                triplet.sendToSrc(investmentMap)
+                triplet.sendToSrc(investmentMapWithoutCycle)
               } else {
-                println("========== 发现成环 ========")
+                val investmentMap = Map(dstInvestComID -> // 5L
+                  simpleInvestmentInfo(
+                    investedComName = dstInvestComName, // 被投资企业名称
+                    proportionOfInvestment = mulLevelProportionOfInvestment, // 投资占比
+                    upperStreamId = srcID, // 边上游股东
+                    level = srcLinkDstLevel, // 层级间隔
+                  ))
+                triplet.sendToSrc(investmentMap)
               }
           }
         },
@@ -164,11 +175,13 @@ object G014_CrossShareHolding_DCG_SimpleData {
               val sumOfProportion: BigDecimal = {
                 BigDecimal(v.proportionOfInvestment) + BigDecimal(leftMap.getOrElse(k, simpleInvestmentInfo()).proportionOfInvestment)
               }
+
               k -> simpleInvestmentInfo(
                 investedComName = v.investedComName, // 被投资企业名称
                 proportionOfInvestment = sumOfProportion.formatted("%.6f"), // 投资占比求和
                 upperStreamId = v.upperStreamId, // 上游股东id
                 level = v.level, // 层级间隔
+                ifCycle = v.ifCycle // 是否成环
               )
           }
           reduceLeftAndRightMap
@@ -176,57 +189,65 @@ object G014_CrossShareHolding_DCG_SimpleData {
       )
 
       /*
-       * STEP6 leftJoin，将新老信息合并
+       * STEP6 leftJoin之前一步，将nStepOfShareHolding中，成环的多余信息清空
+       * 判断方法：存在自己对自己持股的，统统干掉，复原为 defaultVertex
+       *
+       * 注意这里 nStepOfShareHolding RDD 存的是所有顶点的信息
        *
        */
 
+      /*
+       * STEP7 leftJoin，将新老信息合并
+       *
+       */
+
+      //          // 测试
+      //          if (vid == 2L) {
+      //            println("\n=========================")
+      //            println("大鹏旧图： " + oldGraphInvInfo)
+      //            println("大鹏新图： " + newGraphInvInfo)
+      //          } else if (vid == 4L) {
+      //            println("\n=========================")
+      //            println("4右护法旧图： " + oldGraphInvInfo)
+      //            println("4右护法新图： " + newGraphInvInfo)
+      //          }
 
       val newVertexWithMulLevelInvestInfo: VertexRDD[simpleProperties] = OldGraph.vertices.leftZipJoin(nStepOfShareHolding)(
         (vid: VertexId, vd: simpleProperties, nvd: Option[Map[VertexId, simpleInvestmentInfo]]) => {
 
-          val oldGraphInvInfo: Map[VertexId, simpleInvestmentInfo] = vd.oneStepInvInfo
+          val oldGraphInvInfo: Map[VertexId, simpleInvestmentInfo] = vd.nStepInvInfo
           val newGraphInvInfo: Map[VertexId, simpleInvestmentInfo] = nvd.getOrElse(defaultInvestmentInfo)
 
-          // 测试
-          if (vid == 2L) {
-            println("\n=========================")
-            println("大鹏旧图： " + oldGraphInvInfo)
-            println("大鹏新图： " + newGraphInvInfo)
-          } else if (vid == 4L) {
-            println("\n=========================")
-            println("4右护法旧图： " + oldGraphInvInfo)
-            println("4右护法新图： " + newGraphInvInfo)
-          }
-
-          // 这里简单同Key相加是有问题的，只有old和new同key的value不一致的时候才行
-          val sumOfOldAndNewGraphInvInfo: Map[VertexId, simpleInvestmentInfo] = oldGraphInvInfo ++ newGraphInvInfo.map {
-            case (k: VertexId, v: simpleInvestmentInfo) =>
-              // 如果不一致新旧图的value不一致再相加
-              // TODO 检查问题：如果在New环里面出现自己对自己的投资，相加会不会有问题
-              if (v.proportionOfInvestment != oldGraphInvInfo.getOrElse(k, simpleInvestmentInfo()).proportionOfInvestment) {
-                val sumOfOldAndNewGraphProportion: BigDecimal =
-                  BigDecimal(v.proportionOfInvestment) +
-                    BigDecimal(oldGraphInvInfo.getOrElse(k, simpleInvestmentInfo()).proportionOfInvestment)
-                k -> simpleInvestmentInfo(
-                  investedComName = v.investedComName // 被投资企业名称
-                  , proportionOfInvestment = sumOfOldAndNewGraphProportion.formatted("%.6f") // 投资占比求和
-                  , upperStreamId = v.upperStreamId // 上游股东id
-                  , level = v.level // 层级间隔
-                )
-              } else {
-                // 否则（如果一致）则直接采用旧Graph的值
-                k -> simpleInvestmentInfo(
-                  investedComName = v.investedComName // 被投资企业名称
-                  , proportionOfInvestment = BigDecimal(v.proportionOfInvestment).formatted("%.6f") // 投资占比求和
-                  , upperStreamId = v.upperStreamId // 上游股东id
-                  , level = v.level // 层级间隔
-                )
-              }
-          }
-          simpleProperties(
+          val maybeCycleSimpleProperties: simpleProperties = simpleProperties(
             vd.name, // 姓名
-            sumOfOldAndNewGraphInvInfo // 持股信息 新老合并
-          )
+            oldGraphInvInfo ++ newGraphInvInfo,
+            vd.initInvInfo,
+            vd.lastCycleInvInfo,
+          ) // 持股信息 新老合并
+
+          // 如果当前顶点信息中有自己对自己持股，说明成环，应该：
+          // 3. 恢复初始图（newVertexWithInvInfo）的的下一阶投资信息
+          if (maybeCycleSimpleProperties.nStepInvInfo.contains(vid)) { // 如果自己对自己持股（成环）
+            // 成环后，自己对自己的持股，比如 4右护法 对 4右护法 是 0.25
+
+            // TODO 这个0.25需要乘进去，025还没有传给上游节点
+            val nStepToSelfInvInfo: simpleInvestmentInfo =
+              maybeCycleSimpleProperties.nStepInvInfo.getOrElse(vid, simpleInvestmentInfo())
+            // 组合为map
+            val nStepToSelf: Map[VertexId, simpleInvestmentInfo] = Map(vid -> nStepToSelfInvInfo)
+
+            val emptySimpleProperties: simpleProperties = simpleProperties(
+              maybeCycleSimpleProperties.name, // 名称
+              maybeCycleSimpleProperties.initInvInfo, // 数据复原，实际上这里应该乘以第二轮的剩余量
+              maybeCycleSimpleProperties.initInvInfo, // 初始数据
+              nStepToSelf, // 这里保存了成环上一轮的余量，例如0.25 -> 0.0625 --> 0.015625
+            ) // 持股信息 新老合并
+            emptySimpleProperties
+
+          } else {
+            val noCycleSimpleProperties: simpleProperties = maybeCycleSimpleProperties
+            noCycleSimpleProperties
+          }
         }
       )
 
@@ -253,11 +274,11 @@ object G014_CrossShareHolding_DCG_SimpleData {
         loop(n - 1, nStepShareHoldingCalculate(currRes))
       }
 
-      loop(n, oneStepInvInfoGraph) // loop(递归次数, 初始值)
+      loop(n, nStepInvInfoGraph) // loop(递归次数, 初始值)
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[simpleProperties, Double] = tailFact(8) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[simpleProperties, Double] = tailFact(7) // 理论上递归次数增加不影响结果才是对的
     val endTime: Long = System.currentTimeMillis()
     println("\nG13运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
