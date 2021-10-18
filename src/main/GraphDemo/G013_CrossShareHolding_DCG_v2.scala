@@ -299,7 +299,7 @@ object G013_CrossShareHolding_DCG_v2 {
     }
 
     println("\n================ 打印最终持股计算新生成的顶点 ===================\n")
-    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(8) // 理论上递归次数增加不影响结果才是对的
+    val ShareHoldingGraph: Graph[baseProperties, Double] = tailFact(7) // 理论上递归次数增加不影响结果才是对的
     val endTime: Long = System.currentTimeMillis()
     println("\nG13运行时间： " + (endTime - startTime))
     ShareHoldingGraph.vertices.collect.foreach(println)
