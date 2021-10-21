@@ -22,7 +22,7 @@ case class simpleProperties(
 
 case class simpleInvestmentInfo(
                                  investedComName: String = "default_name", // 被投资企业的名称，和Key对应
-                                 proportionOfInvestment: BigDecimal = 0.000000, // 投资占比
+                                 investmentMap: Map[VertexId, BigDecimal] = Map(99999L -> BigDecimal(0.00000)), // 投资占比
                                )
 
 case class Attr(
