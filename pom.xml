@@ -38,28 +38,28 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.12</artifactId>
             <version>3.1.1</version>
-            <scope>provided</scope>
+
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-graphx -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-graphx_2.12</artifactId>
             <version>3.1.1</version>
-            <scope>provided</scope>
+
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-sql -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.12</artifactId>
             <version>3.1.1</version>
-            <scope>provided</scope>
+
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.typelevel/discipline-scalatest -->
         <dependency>
             <groupId>org.typelevel</groupId>
             <artifactId>discipline-scalatest_2.12</artifactId>
             <version>2.1.1</version>
-            <scope>test</scope>
+
         </dependency>
     </dependencies>
 

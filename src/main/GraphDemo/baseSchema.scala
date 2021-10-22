@@ -25,7 +25,7 @@ case class simpleInvestmentInfo(
                                  investmentMap: Map[VertexId, BigDecimal] = Map(99999L -> BigDecimal(0.00000)), // 投资占比
                                )
 
-case class Attr(
-                 neigh: List[VertexId],
-                 values: Map[VertexId, Double]
-               )
+//case class Attr(
+//                 neigh: List[VertexId],
+//                 values: Map[VertexId, Double]
+//               )
