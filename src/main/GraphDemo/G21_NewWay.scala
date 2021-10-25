@@ -5,7 +5,7 @@ import org.scalatest.funsuite.FixtureAnyFunSuite
 
 case class Attr(neigh: List[Long], values: Map[Long, Double])
 
-class SparkTest extends FixtureAnyFunSuite{
+class SparkTest extends FixtureAnyFunSuite {
 
   override type FixtureParam = SparkSession
 
@@ -39,47 +39,43 @@ class SparkTest extends FixtureAnyFunSuite{
 
     }, // merge Message
       (m1, m2) => {
-      Attr(m1.neigh ++ m2.neigh, m1.values ++ m2.values)
-    })
+        Attr(m1.neigh ++ m2.neigh, m1.values ++ m2.values)
+      })
 
     // join 初始化图
     val initGraph = graph.outerJoinVertices(initVertex)((vid, vdata, nvdata) => {
-      if (nvdata.isEmpty)
-        Attr(List.empty, Map.empty)
-      else
-        nvdata.get
+      nvdata.getOrElse(Attr(List.empty, Map.empty))
     })
     //初始化基础图的数据
     initGraph.vertices.foreach(row => {
       println(row)
     })
-    calV2(initGraph)  // 基于初始化图，开始循环计算
+    calV2(initGraph) // 基于初始化图，开始循环计算
   }
 
   private def calV2(initGraph: Graph[Attr, Double]) = {
     val tinitGraph = initGraph.mapVertices((vid, vdata) => {
       vdata.values.map(row => {
         (row._1, Map(row))
-      }).toMap
+      })
     })
     println("=================")
     tinitGraph.vertices.foreach(println)
     var flagGraph = tinitGraph
     for (i <- 0 to 10) {
       val nGraph = flagGraph.aggregateMessages[Map[VertexId, Map[VertexId, Double]]](triplet => {
-        val ratio = triplet.attr
-        val dst = triplet.dstAttr
-        val dstId = triplet.dstId
-        val src = triplet.srcAttr
+        val ratio: Double = triplet.attr
+        val dst: Map[VertexId, Map[VertexId, Double]] = triplet.dstAttr
+        val dstId: VertexId = triplet.dstId
         //将dst上的信息先合并一下，理论输出节点上的持股关系时，也要合并一下
-        val dd = dst.values.flatMap(_.toSeq).groupBy(_._1).mapValues(rr => {
+        val dd: Map[VertexId, Double] = dst.values.flatMap(_.toSeq).groupBy(_._1).mapValues(rr => {
           rr.map(r1 => {
             r1._2 * ratio
           }).sum
         }).map(row => {
           (row._1, row._2)
         })
-        //val originDst = src.get(dstId).get //原来这个目标点发过来什么消息，先拿过来作为BASE
+
         triplet.sendToSrc(Map(dstId -> dd))
       }, (m1, m2) => {
         m1 ++ m2
@@ -91,7 +87,7 @@ class SparkTest extends FixtureAnyFunSuite{
           var m = row._2
           if (ndata.contains(row._1)) {
             val origin = row._2
-            val nn = ndata.get(row._1).get
+            val nn = ndata(row._1)
             //增量的持股信息
             val nKeyMaps = nn.filter(r => {
               !origin.contains(r._1)
@@ -101,11 +97,11 @@ class SparkTest extends FixtureAnyFunSuite{
               nn.contains(r._1)
             }).map(row => {
               //如果差异很小了，就不考虑了
-              if (Math.abs(row._2 - nn.get(row._1).get) < 0.0001) {
+              if (Math.abs(row._2 - nn(row._1)) < 0.0001) {
                 row
               }
               else {
-                (row._1, row._2 + nn.get(row._1).get)
+                (row._1, row._2 + nn(row._1))
               }
             })
             //存量的（差异的保留）
