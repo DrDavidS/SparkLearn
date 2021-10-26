@@ -64,9 +64,9 @@ class SparkTest extends FixtureAnyFunSuite {
     })
     println("=======  tinitGraph  ==========")
     tinitGraph.vertices.foreach(println)
-    var flagGraph = tinitGraph
+    var flagGraph: Graph[Map[VertexId, Map[VertexId, Double]], Double] = tinitGraph
     for (i <- 0 to 20) {
-      val nGraph: VertexRDD[Map[VertexId, Map[VertexId, Double]]] = flagGraph.aggregateMessages[Map[VertexId, Map[VertexId, Double]]](
+      val msgVertexRDD: VertexRDD[Map[VertexId, Map[VertexId, Double]]] = flagGraph.aggregateMessages[Map[VertexId, Map[VertexId, Double]]](
         triplet => {
           val ratio: Double = triplet.attr
           val dst: Map[VertexId, Map[VertexId, Double]] = triplet.dstAttr
@@ -82,11 +82,10 @@ class SparkTest extends FixtureAnyFunSuite {
           })
 
           triplet.sendToSrc(Map(dstId -> dd))
-        }, (m1, m2) => {
-          m1 ++ m2
-        })
+        }, _ ++ _
+      )
 
-      val baseGraph = tinitGraph.outerJoinVertices(nGraph)((vid, vdata, nvdata) => {
+      val baseGraph = tinitGraph.outerJoinVertices(msgVertexRDD)((vid, vdata, nvdata) => {
         val ndata = nvdata.getOrElse(Map.empty)
         val unionData = vdata.map(row => {
 
@@ -118,9 +117,6 @@ class SparkTest extends FixtureAnyFunSuite {
           (row._1, unionMap)
         })
         unionData
-      })
-      baseGraph.vertices.foreach((row: (VertexId, Map[VertexId, Map[VertexId, Double]])) => {
-        // println(row)
       })
       flagGraph = baseGraph
     }
