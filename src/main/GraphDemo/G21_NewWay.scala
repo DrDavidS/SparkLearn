@@ -1,4 +1,4 @@
-import org.apache.spark.graphx.{Edge, Graph, VertexId}
+import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.Outcome
 import org.scalatest.funsuite.FixtureAnyFunSuite
@@ -21,11 +21,12 @@ class SparkTest extends FixtureAnyFunSuite {
 
   test("stockholder") { spark =>
     val seq = Seq(
-      Edge(1L, 6L, 1.0), // 青毛狮子怪 -> 狮驼岭集团
-      Edge(6L, 4L, 1.0), // 狮驼岭集团 -> 右护法
-      Edge(6L, 3L, 1.0), // 狮驼岭集团 -> 左护法
-      Edge(4L, 5L, 0.675325), // 右护法 -> 小钻风
-      Edge(3L, 5L, 0.324675) // 左护法 -> 小钻风
+      Edge(1L, 3L, 0.5), // 青毛狮子怪 -> 左护法
+      Edge(2L, 4L, 0.5), // 大鹏金翅雕 -> 左护法
+      Edge(3L, 7L, 1.0),
+      Edge(7L, 4L, 0.5),
+      Edge(4L, 10L, 1.0),
+      Edge(10L, 3L, 0.5),
     )
     val edgeRDD = spark.sparkContext.parallelize(seq)
     val graph = Graph.fromEdges(edgeRDD, Attr(List.empty, Map.empty))
@@ -48,44 +49,48 @@ class SparkTest extends FixtureAnyFunSuite {
     })
     //初始化基础图的数据
     initGraph.vertices.foreach(row => {
-      println(row)
+      // println(row)
     })
-    calV2(initGraph) // 基于初始化图，开始循环计算
+    val resGraph = calV2(initGraph) // 基于初始化图，开始循环计算
+    println("=======  resGraph  ==========")
+    resGraph.vertices.foreach(println)
   }
 
-  private def calV2(initGraph: Graph[Attr, Double]) = {
-    val tinitGraph = initGraph.mapVertices((vid, vdata) => {
+  private def calV2(initGraph: Graph[Attr, Double]): Graph[Map[VertexId, Map[VertexId, Double]], Double] = {
+    val tinitGraph: Graph[Map[VertexId, Map[VertexId, Double]], Double] = initGraph.mapVertices((vid: VertexId, vdata: Attr) => {
       vdata.values.map(row => {
         (row._1, Map(row))
       })
     })
-    println("=================")
+    println("=======  tinitGraph  ==========")
     tinitGraph.vertices.foreach(println)
     var flagGraph = tinitGraph
-    for (i <- 0 to 10) {
-      val nGraph = flagGraph.aggregateMessages[Map[VertexId, Map[VertexId, Double]]](triplet => {
-        val ratio: Double = triplet.attr
-        val dst: Map[VertexId, Map[VertexId, Double]] = triplet.dstAttr
-        val dstId: VertexId = triplet.dstId
-        //将dst上的信息先合并一下，理论输出节点上的持股关系时，也要合并一下
-        val dd: Map[VertexId, Double] = dst.values.flatMap(_.toSeq).groupBy(_._1).mapValues(rr => {
-          rr.map(r1 => {
-            r1._2 * ratio
-          }).sum
-        }).map(row => {
-          (row._1, row._2)
-        })
+    for (i <- 0 to 20) {
+      val nGraph: VertexRDD[Map[VertexId, Map[VertexId, Double]]] = flagGraph.aggregateMessages[Map[VertexId, Map[VertexId, Double]]](
+        triplet => {
+          val ratio: Double = triplet.attr
+          val dst: Map[VertexId, Map[VertexId, Double]] = triplet.dstAttr
+          val dstId: VertexId = triplet.dstId
 
-        triplet.sendToSrc(Map(dstId -> dd))
-      }, (m1, m2) => {
-        m1 ++ m2
-      })
+          //将dst上的信息先合并一下，理论输出节点上的持股关系时，也要合并一下
+          val dd: Map[VertexId, Double] = dst.values.flatMap(_.toSeq).groupBy(_._1).mapValues(rr => {
+            rr.map(r1 => {
+              r1._2 * ratio
+            }).sum
+          }).map(row => {
+            (row._1, row._2)
+          })
+
+          triplet.sendToSrc(Map(dstId -> dd))
+        }, (m1, m2) => {
+          m1 ++ m2
+        })
 
       val baseGraph = tinitGraph.outerJoinVertices(nGraph)((vid, vdata, nvdata) => {
         val ndata = nvdata.getOrElse(Map.empty)
-        val d = vdata.map(row => {
-          var m = row._2
-          if (ndata.contains(row._1)) {
+        val unionData = vdata.map(row => {
+
+          val unionMap = if (ndata.contains(row._1)) {
             val origin = row._2
             val nn = ndata(row._1)
             //增量的持股信息
@@ -97,7 +102,7 @@ class SparkTest extends FixtureAnyFunSuite {
               nn.contains(r._1)
             }).map(row => {
               //如果差异很小了，就不考虑了
-              if (Math.abs(row._2 - nn(row._1)) < 0.0001) {
+              if (Math.abs(row._2 - nn(row._1)) < 0.01) {
                 row
               }
               else {
@@ -108,16 +113,17 @@ class SparkTest extends FixtureAnyFunSuite {
             val diffNN = origin.filter(r => {
               !nn.contains(r._1)
             })
-            m = diffNN ++ reserve ++ nKeyMaps
-          }
-          (row._1, m)
+            diffNN ++ reserve ++ nKeyMaps
+          } else row._2
+          (row._1, unionMap)
         })
-        d
+        unionData
       })
       baseGraph.vertices.foreach((row: (VertexId, Map[VertexId, Map[VertexId, Double]])) => {
-        println(row)
+        // println(row)
       })
       flagGraph = baseGraph
     }
+    flagGraph
   }
 }
