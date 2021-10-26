@@ -91,9 +91,10 @@ object G015_yuqueData_youhua {
   /**
    * 这个函数是给尾递归调用的
    *
-   * @param inGraph 输入的图
-   * @return loopGraph 返回一次计算后的结果图
-   */
+   * @param stepGraph 每次迭代输入的图
+   * @param initGraph 初始图，用于Join
+   * @return
+  */
   def graphCalculate(stepGraph: Graph[Map[VertexId, Map[VertexId, Double]], Double],
                      initGraph: Graph[Map[VertexId, Map[VertexId, Double]], Double]
                     ): Graph[Map[VertexId, Map[VertexId, Double]], Double] = {
