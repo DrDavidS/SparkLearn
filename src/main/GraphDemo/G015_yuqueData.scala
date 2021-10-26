@@ -16,7 +16,7 @@ import scala.annotation.tailrec
  *
  */
 
-object G016_yuqueData_youhua {
+object G015_yuqueData_youhua {
   def main(args: Array[String]): Unit = {
     val sc: SparkContext = SparkLocalConf().sc
 
