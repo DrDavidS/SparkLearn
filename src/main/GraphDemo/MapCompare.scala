@@ -1,8 +1,11 @@
 object MapCompare {
   def main(args: Array[String]): Unit = {
-    val immutableMap = Map("Jim" -> 22, "yxj" -> 32)
-    val stringToInt: Map[String, Int] = immutableMap.map((row: (String, Int)) => (row._1, row._2))
-    println(stringToInt)
-    println(immutableMap)
+    val dt: String = "20211101"
+    val naturalPerson2Corp: String =
+      s"""SELECT srcid,dstid,stock_ratio
+         |FROM ant_zmc.adm_zmep_graph_human2com_edge_df
+         |WHERE dt=$dt
+         |""".stripMargin
+    println(naturalPerson2Corp)
   }
 }

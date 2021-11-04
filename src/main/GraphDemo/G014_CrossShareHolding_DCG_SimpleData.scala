@@ -80,7 +80,7 @@ object G014_CrossShareHolding_DCG_SimpleData {
           val vertexIdToDecimal: Map[VertexId, BigDecimal] = idToDecimal.map((row: (VertexId, BigDecimal)) => (row._1, row._2))
           triplet.sendToSrc(Map(dstId -> vertexIdToDecimal))
         },
-        // Merge Messages
+        // `Merge Messages`
         (message1, message2) => {
           message1 ++ message2
         })
