@@ -29,6 +29,7 @@ object G06_Pregel {
       if (id == sourceId) 0.0 else Double.PositiveInfinity)
 
     val sssp: Graph[Double, Double] = initialGraph.pregel(Double.PositiveInfinity)(
+      // 分析 PREGEL API 的用法
       (id: VertexId, dist: Double, newDist: Double) =>
         math.min(dist, newDist), // 顶点程序
       (triplet: EdgeTriplet[Double, Double]) => { // 发送消息

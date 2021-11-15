@@ -1,10 +1,6 @@
-package NormalGraphX
-
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
-
-import ReadDataOnHive.TailFact
 
 /**
  * Graph Demo 17 优化版本
